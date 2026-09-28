@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Identity;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using RetailLab.Core;
@@ -7,6 +8,20 @@ using RetailLab.Web.Services;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddRazorPages();
+
+// Standard ASP.NET Core Identity with the Entity Framework store.
+// UserManager and SignInManager own password hashing and cookie sign-in;
+// accounts persist in the framework-managed AspNet* tables. Unique email
+// addresses; confirmed accounts are not required for this local demo.
+// Cookie paths use the Identity defaults (/Account/Login and friends).
+builder.Services.AddAuthorization();
+builder.Services
+    .AddIdentity<IdentityUser, IdentityRole>(options =>
+    {
+        options.User.RequireUniqueEmail = true;
+        options.SignIn.RequireConfirmedAccount = false;
+    })
+    .AddEntityFrameworkStores<RetailLabDbContext>();
 
 // Same database resolution as LabCli so the console and the website can
 // deliberately share one local demonstration database.
@@ -30,6 +45,8 @@ var connectionString = new SqliteConnectionStringBuilder
 builder.Services.AddDbContext<RetailLabDbContext>(options => options.UseSqlite(connectionString));
 builder.Services.AddScoped<IRetailRepository, EfRetailRepository>();
 builder.Services.AddScoped<CatalogService>();
+builder.Services.AddScoped<BookmarkService>();
+builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<CatalogDisplayMapper>();
 
 var app = builder.Build();
@@ -56,6 +73,8 @@ app.UseExceptionHandler("/Error");
 app.UseHsts();
 app.UseStaticFiles();
 app.UseRouting();
+app.UseAuthentication();
+app.UseAuthorization();
 app.MapRazorPages();
 
 app.Run();

@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using RetailLab.Data;
 
@@ -10,9 +11,11 @@ using RetailLab.Data;
 namespace RetailLab.Data.Migrations
 {
     [DbContext(typeof(RetailLabDbContext))]
-    partial class RetailLabDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260928173434_IdentitySchema")]
+    partial class IdentitySchema
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.12");

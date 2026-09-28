@@ -1,0 +1,13 @@
+@page
+@model RetailLab.Web.Pages.Account.LogoutModel
+@{
+    ViewData["Title"] = "Sign out";
+}
+
+<h1>Sign out</h1>
+<p>Are you sure you want to sign out?</p>
+
+<form method="post">
+    <button class="button" type="submit">Sign out</button>
+    <a asp-page="/Index">Cancel</a>
+</form>

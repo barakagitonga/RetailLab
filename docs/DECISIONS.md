@@ -77,12 +77,28 @@ Status: approved and implemented (Tutorial 3).
 
 Create `RetailLab.Web` with home, catalogue, and product-details pages over the existing Core and Data layers, sharing the same SQLite database and migration initializer as the console. `CatalogService` in Core owns the active-only lookup invariant; the Web-only `CatalogDisplayMapper` owns USD formatting and availability bands (`Out of stock` at 0, `Low stock` at 1-5, `In stock` above), keeping Core locale-free per D006. Razor views bind only to display models. Archived and unknown SKUs return the same 404. The home page shows a "catalogue preview" (first few products) since no featured-product rule exists. The single Core description is used honestly as the display name; no schema change was made for copy. No TestServer package: automated coverage is unit plus SQLite tests, with Razor compile errors caught by `dotnet build`. The test project references Web one-way for display tests. Runtime database files are git-ignored; the repository never stores them.
 
+## D010 - Customer accounts on the standard Identity EF store, and sign-in-first favourites
+
+Status: approved and implemented (Tutorial 4).
+
+Use ASP.NET Core Identity's `UserManager`/`SignInManager` with cookie sign-in and the standard Entity Framework store over the framework-managed `AspNet*` tables. The Identity user id maps to Core's `CustomerIdentifier`, so favourites isolate per account while Core keeps no Identity dependency. Registration confirms email immediately (no mail sender exists); confirmed accounts are not required, failed sign-ins count toward the default lockout, and the default password policy applies.
+
+Reason: the standard store keeps all security-sensitive persistence inside the maintained framework instead of RetailLab code. It adds one well-understood package (`Microsoft.AspNetCore.Identity.EntityFrameworkCore`) and the full Identity schema, which future roles or external logins can reuse unchanged.
+
+Anonymous favourite flow correction: an anonymous POST to the `[Authorize]` Favourites page would be challenged before its handler runs, and Identity's login return would come back as GET, so the original POST must never be implied or replayed. Catalogue and product pages therefore render a "Sign in to save" link (local return URL, validated with `Url.IsLocalUrl`) for anonymous visitors, and Add/Remove POST forms only for signed-in customers. Every POST uses Post-Redirect-Get with TempData notices and validated return URLs (Add falls back to the product page or catalogue, Remove to `/Favourites`).
+
+Consequences:
+
+- `Data` references the `Microsoft.AspNetCore.Identity.EntityFrameworkCore` package; no custom store or manual account mapping exists.
+- The `AspNet*` tables arrive through an additive migration; existing business data is untouched.
+- Two-customer isolation, redirect fallbacks, and the standard Identity account flows (hashing, sign-in, generic credential errors, lockout) are covered by automated tests.
+
 ## Open decisions
 
 | Question | Resolve before |
 | --- | --- |
 | Permanent retailer brand and multi-currency support (Tutorial 3 uses temporary name RetailLab and USD-at-edge) | Storefront hardening |
 | Stock adjustment reason taxonomy (free text vs enum) and actor roles | Protected web workflows |
-| Authentication implementation and staff/customer permissions | Protected web workflows |
+| Staff permissions and roles (customer password sign-in is done) | Protected web workflows |
 | Concurrency strategy and duplicate submission handling | Multi-user ordering |
 | Server storage, data ownership, synchronization transport, and conflict policy | Synchronization implementation |

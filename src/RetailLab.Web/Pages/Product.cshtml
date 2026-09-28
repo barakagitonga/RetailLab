@@ -17,6 +17,29 @@ else
     <p class="sku">Product code: @Model.Product.Sku</p>
     <p class="price">@Model.Product.PriceDisplay</p>
     <p class="availability @Model.Product.AvailabilityTone">@Model.Product.Availability</p>
+    @if (User.Identity?.IsAuthenticated == true)
+    {
+        if (Model.IsFavourite)
+        {
+            <form method="post" asp-page="/Favourites" asp-page-handler="Remove">
+                <input type="hidden" name="sku" value="@Model.Product.Sku" />
+                <input type="hidden" name="returnUrl" value="@Request.Path" />
+                <button type="submit">Remove from favourites</button>
+            </form>
+        }
+        else
+        {
+            <form method="post" asp-page="/Favourites" asp-page-handler="Add">
+                <input type="hidden" name="sku" value="@Model.Product.Sku" />
+                <input type="hidden" name="returnUrl" value="@Request.Path" />
+                <button type="submit">Add to favourites</button>
+            </form>
+        }
+    }
+    else
+    {
+        <p><a asp-page="/Account/Login" asp-route-returnUrl="@Request.Path">Sign in to save</a></p>
+    }
     @if (Model.Product.IsOutOfStock)
     {
         <p>Currently unavailable. Please check back later.</p>

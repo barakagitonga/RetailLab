@@ -1,0 +1,32 @@
+@page
+@model RetailLab.Web.Pages.FavouritesModel
+@{
+    ViewData["Title"] = "Favourites";
+}
+
+<h1>Your favourites</h1>
+
+@if (Model.Items.Count == 0)
+{
+    <p>You have no favourites yet.</p>
+    <p><a asp-page="/Products">Browse the catalogue</a> to save products you like.</p>
+}
+else
+{
+    <ul class="cards">
+        @foreach (var product in Model.Items)
+        {
+            <li class="card">
+                <h2><a asp-page="/Product" asp-route-sku="@product.Sku">@product.Description</a></h2>
+                <p class="sku">Product code: @product.Sku</p>
+                <p class="price">@product.PriceDisplay</p>
+                <p class="availability @product.AvailabilityTone">@product.Availability</p>
+                <form method="post" asp-page="/Favourites" asp-page-handler="Remove">
+                    <input type="hidden" name="sku" value="@product.Sku" />
+                    <input type="hidden" name="returnUrl" value="/Favourites" />
+                    <button type="submit">Remove from favourites</button>
+                </form>
+            </li>
+        }
+    </ul>
+}

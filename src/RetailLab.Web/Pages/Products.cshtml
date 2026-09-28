@@ -20,6 +20,29 @@ else
                 <p class="sku">Product code: @product.Sku</p>
                 <p class="price">@product.PriceDisplay</p>
                 <p class="availability @product.AvailabilityTone">@product.Availability</p>
+                @if (User.Identity?.IsAuthenticated == true)
+                {
+                    if (Model.FavouriteSkus.Contains(product.Sku))
+                    {
+                        <form method="post" asp-page="/Favourites" asp-page-handler="Remove">
+                            <input type="hidden" name="sku" value="@product.Sku" />
+                            <input type="hidden" name="returnUrl" value="@Request.Path" />
+                            <button type="submit">Remove from favourites</button>
+                        </form>
+                    }
+                    else
+                    {
+                        <form method="post" asp-page="/Favourites" asp-page-handler="Add">
+                            <input type="hidden" name="sku" value="@product.Sku" />
+                            <input type="hidden" name="returnUrl" value="@Request.Path" />
+                            <button type="submit">Add to favourites</button>
+                        </form>
+                    }
+                }
+                else
+                {
+                    <a asp-page="/Account/Login" asp-route-returnUrl="@Request.Path">Sign in to save</a>
+                }
             </li>
         }
     </ul>
