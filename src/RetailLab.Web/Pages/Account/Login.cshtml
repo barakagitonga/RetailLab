@@ -1,0 +1,29 @@
+@page
+@model RetailLab.Web.Pages.Account.LoginModel
+@{
+    ViewData["Title"] = "Sign in";
+}
+
+<h1>Sign in</h1>
+<p>Sign in to save favourites. Nothing is saved merely by signing in.</p>
+
+<form method="post" asp-route-returnUrl="@Model.ReturnUrl">
+    <div asp-validation-summary="ModelOnly" role="alert"></div>
+    <div class="field">
+        <label asp-for="Input.Email"></label>
+        <input asp-for="Input.Email" autocomplete="email" />
+        <span asp-validation-for="Input.Email"></span>
+    </div>
+    <div class="field">
+        <label asp-for="Input.Password"></label>
+        <input asp-for="Input.Password" autocomplete="current-password" />
+        <span asp-validation-for="Input.Password"></span>
+    </div>
+    <div class="field field-inline">
+        <input asp-for="Input.RememberMe" />
+        <label asp-for="Input.RememberMe"></label>
+    </div>
+    <button class="button" type="submit">Sign in</button>
+</form>
+
+<p>No account yet? <a asp-page="/Account/Register" asp-route-returnUrl="@Model.ReturnUrl">Create one</a>.</p>

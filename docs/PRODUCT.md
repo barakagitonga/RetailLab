@@ -102,6 +102,22 @@ dotnet run --project src/RetailLab.Web
 
 Then open the printed `http://localhost:XXXX` URL in a browser. To share a demonstration database with the console, set `RETAILLAB_DATA_DIRECTORY` to the same directory for both processes.
 
+## Tutorial 4: customer accounts and favourites
+
+Status: implemented in `RetailLab.Web` with auth storage in `RetailLab.Data`.
+
+Customers register and sign in with an email and password. Authentication is framework-managed: ASP.NET Core Identity (`UserManager`/`SignInManager`) owns password hashing and cookie sign-in, and accounts persist in the standard framework-managed Identity tables (`AspNetUsers`, `AspNetRoles`, claims, logins, and tokens). No credentials live in RetailLab business tables. Each account is identified by its Identity user id, so favourites are strictly isolated per customer.
+
+- Routes: `/Account/Register`, `/Account/Login`, `/Account/Logout`, `/Favourites` (all favourite mutations), plus favourite controls on `/Products` and `/Products/{sku}`.
+- Anonymous visitors see a "Sign in to save" link carrying a safe local return URL. After login they land back on the originating catalogue or product page and explicitly press Add; signing in never creates a favourite by itself.
+- Signed-in customers see Add/Remove forms posting to the fully `[Authorize]` Favourites page. Every POST redirects (Post-Redirect-Get) with a friendly TempData notice, so refreshing never resubmits.
+- Submitted return URLs are validated with `Url.IsLocalUrl`. Add falls back to the matching product page (or catalogue); Remove falls back to `/Favourites`. Direct anonymous visits to `/Favourites` challenge and return there after login; forged anonymous POSTs are challenged before any handler runs and are never replayed.
+- Registration confirms the email immediately (no email sender exists yet) and applies the default Identity password policy. Failed sign-ins count toward the default Identity lockout.
+
+### Trying two accounts
+
+Run the website, register `anna@example.com`, save a favourite, then register `bob@example.com` in a private window: Bob's favourites start empty while Anna's remain intact. To re-run the demonstration from scratch, point `RETAILLAB_DATA_DIRECTORY` at a fresh empty folder before starting.
+
 ## Scope boundaries
 
-No desktop UI, authentication, favourites, ordering, staff administration, synchronization, search, pagination, deployment, or SaaS tenancy is implemented yet. The website is read-only. Concurrency protection for several simultaneous customers is deferred until a multi-user ordering interface is introduced.
+No desktop UI, ordering, staff administration, synchronization, search, pagination, deployment, or SaaS tenancy is implemented yet. The website has customer accounts and favourites but no checkout. Concurrency protection for several simultaneous customers is deferred until a multi-user ordering interface is introduced.

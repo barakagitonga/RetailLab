@@ -14,10 +14,33 @@
             <nav aria-label="Primary">
                 <a asp-page="/Index">Home</a>
                 <a asp-page="/Products">Catalogue</a>
+                <a asp-page="/Favourites">Favourites</a>
             </nav>
+            <div class="header-auth">
+                @if (User.Identity?.IsAuthenticated == true)
+                {
+                    <span class="greeting">Hello, @User.Identity.Name!</span>
+                    <form method="post" asp-page="/Account/Logout" class="logout-form">
+                        <button type="submit">Sign out</button>
+                    </form>
+                }
+                else
+                {
+                    <a asp-page="/Account/Register">Register</a>
+                    <a asp-page="/Account/Login">Sign in</a>
+                }
+            </div>
         </div>
     </header>
     <main id="main" class="wrap">
+        @if (TempData["StatusMessage"] is string status)
+        {
+            <p class="notice notice-success" role="status">@status</p>
+        }
+        @if (TempData["ErrorMessage"] is string error)
+        {
+            <p class="notice notice-error" role="alert">@error</p>
+        }
         @RenderBody()
     </main>
     <footer class="site-footer">
