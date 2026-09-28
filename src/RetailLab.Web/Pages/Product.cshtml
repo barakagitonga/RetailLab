@@ -1,0 +1,24 @@
+@page "/Products/{sku}"
+@model RetailLab.Web.Pages.ProductModel
+@{
+    ViewData["Title"] = Model.Product?.Description ?? "Not found";
+}
+
+@if (Model.Product is null)
+{
+    <h1>Product not found</h1>
+    <p>That product does not exist or is no longer available.</p>
+    <p><a asp-page="/Products">Back to the catalogue</a></p>
+}
+else
+{
+    <nav aria-label="Breadcrumb"><a asp-page="/Products">Catalogue</a> / @Model.Product.Sku</nav>
+    <h1>@Model.Product.Description</h1>
+    <p class="sku">Product code: @Model.Product.Sku</p>
+    <p class="price">@Model.Product.PriceDisplay</p>
+    <p class="availability @Model.Product.AvailabilityTone">@Model.Product.Availability</p>
+    @if (Model.Product.IsOutOfStock)
+    {
+        <p>Currently unavailable. Please check back later.</p>
+    }
+}

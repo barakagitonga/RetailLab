@@ -480,3 +480,8 @@ $RECYCLE.BIN/
 
 # Vim temporary swap files
 *.swp
+
+# RetailLab runtime SQLite databases (local demonstration data, never commit)
+retaillab.db
+retaillab.db-wal
+retaillab.db-shm

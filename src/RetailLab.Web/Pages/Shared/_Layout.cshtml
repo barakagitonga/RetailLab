@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - RetailLab</title>
+    <link rel="stylesheet" href="~/css/site.css" />
+</head>
+<body>
+    <a class="skip-link" href="#main">Skip to main content</a>
+    <header class="site-header">
+        <div class="wrap header-inner">
+            <a class="brand" asp-page="/Index">RetailLab</a>
+            <nav aria-label="Primary">
+                <a asp-page="/Index">Home</a>
+                <a asp-page="/Products">Catalogue</a>
+            </nav>
+        </div>
+    </header>
+    <main id="main" class="wrap">
+        @RenderBody()
+    </main>
+    <footer class="site-footer">
+        <div class="wrap">
+            <p>RetailLab demonstration store. Simulated catalogue; no real ordering.</p>
+        </div>
+    </footer>
+</body>
+</html>

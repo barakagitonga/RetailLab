@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
@@ -21,6 +21,9 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\RetailLab.Core\RetailLab.Core.csproj" />
     <ProjectReference Include="..\..\src\RetailLab.Data\RetailLab.Data.csproj" />
+    <!-- Needed so mapper/display-model tests compile against the Web project.
+         The reference points one way (Tests -> Web); production code is unaffected. -->
+    <ProjectReference Include="..\..\src\RetailLab.Web\RetailLab.Web.csproj" />
   </ItemGroup>
 
 </Project>

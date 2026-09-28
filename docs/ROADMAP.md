@@ -14,18 +14,17 @@ Implemented safeguards include Core-owned validation, full-order stock checks be
 
 Status: implemented in `RetailLab.LabCli` (Tutorial 2).
 
-Outcome: a staff workflow can create products, update descriptions and prices, archive and unarchive products, apply explicit audited stock adjustments, and view adjustment history. SKU is immutable, products archive instead of deleting, and no adjustment may be zero or drive stock negative. Order placement records matching adjustments so every stock change is audited.
+Outcome: a staff workflow can create products, update descriptions and prices, archive and unarchive products, apply explicit audited stock adjustments, and view adjustment history. SKU is immutable, products archive instead of deleting, and no adjustment may be zero or drive stock negative. Order placement records matching adjustments so every stock change is audited. Bookmarks of archived products are excluded from customer bookmark results while the stored rows are preserved.
 
 Implemented safeguards include Core-owned archive and adjustment rules, reason and actor validation before stock mutation, transactional stock-plus-audit persistence, archived-product exclusion from customer views, an additive migration preserving existing data, and automated Core and SQLite tests.
 
 ## 3. Customer product catalogue on the web
 
-Proposed outcome: customers can browse persisted products in an accessible Razor Pages website.
+Status: implemented in `RetailLab.Web` (Tutorial 3).
 
-- Create `RetailLab.Web` using ASP.NET Core Razor Pages.
-- Start with list and detail pages.
-- Select the retailer theme and currency convention.
-- Reuse Core and Data rather than duplicating rules.
+Outcome: customers can visit a polished home page, browse active products, and open product details. The site reuses Core and Data over the same SQLite database and migration initializer, formats prices as USD, shows In stock / Low stock / Out of stock bands instead of exact counts, hides archived products (404 when requested directly), and serves responsive accessible HTML with locally maintained CSS and no JavaScript framework.
+
+Implemented safeguards include a Core-owned active-only catalogue service, web display models that keep business rules out of markup, startup-vs-request failure separation, tests that need no new packages, and documentation updates.
 
 ## 4. Customer accounts and favourites
 
