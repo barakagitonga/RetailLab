@@ -41,6 +41,12 @@ public sealed class OrderService(IRetailRepository repository, TimeProvider time
                 throw new BusinessRuleException($"No product with SKU '{request.Sku}' was found.");
             }
 
+            if (product.IsArchived)
+            {
+                throw new BusinessRuleException(
+                    $"Product {product.Sku} is archived and cannot be ordered.");
+            }
+
             if (request.Quantity > product.StockQuantity)
             {
                 throw new BusinessRuleException(
@@ -57,6 +63,14 @@ public sealed class OrderService(IRetailRepository repository, TimeProvider time
         {
             product.ReduceStock(quantity);
             order.AddLine(product, quantity);
+            repository.AddInventoryAdjustment(
+                new InventoryAdjustment(
+                    product,
+                    -quantity,
+                    product.StockQuantity,
+                    "Simulated order",
+                    normalizedCustomerIdentifier,
+                    order.PlacedAtUtc));
         }
 
         repository.AddOrder(order);

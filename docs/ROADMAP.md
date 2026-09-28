@@ -12,9 +12,11 @@ Implemented safeguards include Core-owned validation, full-order stock checks be
 
 ## 2. Product and inventory management slice
 
-Proposed outcome: an authorized staff workflow can create products and make explicit stock adjustments.
+Status: implemented in `RetailLab.LabCli` (Tutorial 2).
 
-Before implementation, decide SKU editing, stock adjustment reasons and audit history, product archive/deletion behavior, and whether this slice should start in LabCli or wait for WPF.
+Outcome: a staff workflow can create products, update descriptions and prices, archive and unarchive products, apply explicit audited stock adjustments, and view adjustment history. SKU is immutable, products archive instead of deleting, and no adjustment may be zero or drive stock negative. Order placement records matching adjustments so every stock change is audited.
+
+Implemented safeguards include Core-owned archive and adjustment rules, reason and actor validation before stock mutation, transactional stock-plus-audit persistence, archived-product exclusion from customer views, an additive migration preserving existing data, and automated Core and SQLite tests.
 
 ## 3. Customer product catalogue on the web
 

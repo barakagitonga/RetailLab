@@ -32,5 +32,9 @@ internal sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
             .IsRequired();
 
         builder.Property(product => product.StockQuantity).IsRequired();
+
+        builder.Property(product => product.IsArchived).IsRequired();
+
+        builder.Property(product => product.ArchivedAtUtc);
     }
 }

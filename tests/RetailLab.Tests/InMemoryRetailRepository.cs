@@ -10,11 +10,19 @@ internal sealed class InMemoryRetailRepository(params Product[] products) : IRet
 
     public List<Order> Orders { get; } = [];
 
+    public List<InventoryAdjustment> Adjustments { get; } = [];
+
     public int SaveCount { get; private set; }
 
-    public Task<IReadOnlyList<Product>> GetProductsAsync(CancellationToken cancellationToken = default)
+    public Task<IReadOnlyList<Product>> GetProductsAsync(
+        bool includeArchived = false,
+        CancellationToken cancellationToken = default)
     {
-        return Task.FromResult<IReadOnlyList<Product>>(Products.OrderBy(product => product.Sku).ToList());
+        return Task.FromResult<IReadOnlyList<Product>>(
+            Products
+                .Where(product => includeArchived || !product.IsArchived)
+                .OrderBy(product => product.Sku)
+                .ToList());
     }
 
     public Task<Product?> FindProductBySkuAsync(
@@ -26,12 +34,30 @@ internal sealed class InMemoryRetailRepository(params Product[] products) : IRet
                 product => string.Equals(product.Sku, sku, StringComparison.OrdinalIgnoreCase)));
     }
 
+    public void AddProduct(Product product) => Products.Add(product);
+
+    public void AddInventoryAdjustment(InventoryAdjustment adjustment) => Adjustments.Add(adjustment);
+
+    public Task<IReadOnlyList<InventoryAdjustment>> GetAdjustmentsAsync(
+        Guid productId,
+        CancellationToken cancellationToken = default)
+    {
+        return Task.FromResult<IReadOnlyList<InventoryAdjustment>>(
+            Adjustments
+                .Where(adjustment => adjustment.ProductId == productId)
+                .OrderBy(adjustment => adjustment.CreatedAtUtc)
+                .ToList());
+    }
+
     public Task<IReadOnlyList<Bookmark>> GetBookmarksAsync(
         string customerIdentifier,
         CancellationToken cancellationToken = default)
     {
         return Task.FromResult<IReadOnlyList<Bookmark>>(
-            Bookmarks.Where(bookmark => bookmark.CustomerIdentifier == customerIdentifier).ToList());
+            Bookmarks
+                .Where(bookmark => bookmark.CustomerIdentifier == customerIdentifier &&
+                                   !bookmark.Product.IsArchived)
+                .ToList());
     }
 
     public Task<Bookmark?> FindBookmarkAsync(

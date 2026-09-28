@@ -16,6 +16,11 @@ public sealed class BookmarkService(IRetailRepository repository, TimeProvider t
             throw new BusinessRuleException($"No product with SKU '{sku.Trim()}' was found.");
         }
 
+        if (product.IsArchived)
+        {
+            throw new BusinessRuleException($"Product {product.Sku} is archived and cannot be bookmarked.");
+        }
+
         var existing = await repository.FindBookmarkAsync(
             normalizedCustomerIdentifier,
             product.Id,

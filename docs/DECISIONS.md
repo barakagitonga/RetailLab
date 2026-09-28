@@ -58,12 +58,25 @@ Status: established direction; design remains open.
 
 Build demonstrated local workflows before selecting synchronization transport, server infrastructure, or conflict policies. Sharing Core models does not require the future server and desktop application to use one physical database.
 
+## D008 - Staff product and inventory management in LabCli
+
+Status: approved and implemented.
+
+SKU is immutable after creation. Products are archived rather than deleted; archived products are hidden from customer-facing lists but retained with history. All stock changes are audited: order lines record adjustments with reason `Simulated order` and the customer identifier as actor, while staff corrections use `InventoryService` with an explicit signed delta, required reason, UTC timestamp, and actor identifier (`staff-demo-01` for the demonstration). No adjustment may be zero or drive stock negative. The staff workflow starts in LabCli; WPF remains a later slice. No new production packages were introduced. Existing data is preserved through an additive EF Core migration.
+
+Consequences:
+
+- `Product` carries `IsArchived` and `ArchivedAtUtc`; archive state is a business rule, not a delete.
+- `InventoryAdjustment` is the single audit trail for stock movement.
+- Order placement and staff adjustments share the same transactional stock-plus-audit pattern.
+- Historic order-driven stock changes before this slice have no adjustment rows.
+
 ## Open decisions
 
 | Question | Resolve before |
 | --- | --- |
 | Demonstration retailer, currency, and price display conventions | Customer-facing catalogue |
-| Product creation/editing, stock adjustment audit, and deletion/archive rules | Staff inventory implementation |
+| Stock adjustment reason taxonomy (free text vs enum) and actor roles | Protected web workflows |
 | Authentication implementation and staff/customer permissions | Protected web workflows |
 | Concurrency strategy and duplicate submission handling | Multi-user ordering |
 | Server storage, data ownership, synchronization transport, and conflict policy | Synchronization implementation |

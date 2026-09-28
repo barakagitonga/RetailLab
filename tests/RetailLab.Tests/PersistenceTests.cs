@@ -53,4 +53,43 @@ public sealed class PersistenceTests
         Assert.NotNull(product);
         Assert.Equal(16, product.StockQuantity);
     }
+
+    [Fact]
+    public async Task BookmarkMadeBeforeArchival_IsExcludedFromCustomerBookmarks()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+
+        var options = new DbContextOptionsBuilder<RetailLabDbContext>()
+            .UseSqlite(connection)
+            .Options;
+
+        await using (var initializationContext = new RetailLabDbContext(options))
+        {
+            await DatabaseInitializer.InitializeAsync(initializationContext);
+        }
+
+        var now = new DateTimeOffset(2026, 9, 26, 9, 0, 0, TimeSpan.Zero);
+
+        await using (var commandContext = new RetailLabDbContext(options))
+        {
+            var repository = new EfRetailRepository(commandContext);
+            await new BookmarkService(repository, new TestTimeProvider(now))
+                .AddAsync("customer-demo-001", "AUR-100");
+            await new ProductService(repository, new TestTimeProvider(now))
+                .ArchiveAsync("AUR-100");
+        }
+
+        await using var verificationContext = new RetailLabDbContext(options);
+        var verificationRepository = new EfRetailRepository(verificationContext);
+
+        Assert.Empty(await verificationRepository.GetBookmarksAsync("customer-demo-001"));
+
+        // The bookmark row itself is preserved; only customer visibility changes.
+        var product = await verificationRepository.FindProductBySkuAsync("AUR-100");
+        Assert.NotNull(product);
+        Assert.True(product.IsArchived);
+        var stored = await verificationRepository.FindBookmarkAsync("customer-demo-001", product.Id);
+        Assert.NotNull(stored);
+    }
 }

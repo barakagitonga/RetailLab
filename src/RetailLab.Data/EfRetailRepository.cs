@@ -6,10 +6,17 @@ namespace RetailLab.Data;
 public sealed class EfRetailRepository(RetailLabDbContext dbContext) : IRetailRepository
 {
     public async Task<IReadOnlyList<Product>> GetProductsAsync(
+        bool includeArchived = false,
         CancellationToken cancellationToken = default)
     {
-        return await dbContext.Products
-            .AsNoTracking()
+        var query = dbContext.Products.AsNoTracking();
+
+        if (!includeArchived)
+        {
+            query = query.Where(product => !product.IsArchived);
+        }
+
+        return await query
             .OrderBy(product => product.Sku)
             .ToListAsync(cancellationToken);
     }
@@ -23,6 +30,33 @@ public sealed class EfRetailRepository(RetailLabDbContext dbContext) : IRetailRe
             cancellationToken);
     }
 
+    public void AddProduct(Product product)
+    {
+        dbContext.Products.Add(product);
+    }
+
+    public void AddInventoryAdjustment(InventoryAdjustment adjustment)
+    {
+        dbContext.InventoryAdjustments.Add(adjustment);
+    }
+
+    public async Task<IReadOnlyList<InventoryAdjustment>> GetAdjustmentsAsync(
+        Guid productId,
+        CancellationToken cancellationToken = default)
+    {
+        var adjustments = await dbContext.InventoryAdjustments
+            .AsNoTracking()
+            .Where(adjustment => adjustment.ProductId == productId)
+            .ToListAsync(cancellationToken);
+
+        // SQLite cannot translate DateTimeOffset ordering. The product filter still
+        // runs in the database; this small prototype sorts the resulting history here.
+        return adjustments
+            .OrderBy(adjustment => adjustment.CreatedAtUtc)
+            .ThenBy(adjustment => adjustment.Id)
+            .ToList();
+    }
+
     public async Task<IReadOnlyList<Bookmark>> GetBookmarksAsync(
         string customerIdentifier,
         CancellationToken cancellationToken = default)
@@ -30,7 +64,8 @@ public sealed class EfRetailRepository(RetailLabDbContext dbContext) : IRetailRe
         return await dbContext.Bookmarks
             .AsNoTracking()
             .Include(bookmark => bookmark.Product)
-            .Where(bookmark => bookmark.CustomerIdentifier == customerIdentifier)
+            .Where(bookmark => bookmark.CustomerIdentifier == customerIdentifier &&
+                               !bookmark.Product.IsArchived)
             .OrderBy(bookmark => bookmark.Product.Sku)
             .ToListAsync(cancellationToken);
     }

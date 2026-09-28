@@ -28,18 +28,27 @@ The fixed customer identifier is `customer-demo-001`. It is only a label and is 
 4. Remove a bookmark by SKU.
 5. Place a simulated multi-line order.
 6. View previous simulated orders and their lines.
-7. View remaining inventory.
+7. View remaining inventory (staff view, includes archived products).
+8. Create product (staff).
+9. Update product details (staff).
+10. Archive or unarchive product (staff).
+11. Adjust stock (staff).
+12. View stock adjustment history (staff).
 
 ### Business behavior
 
 - SKU and description are required.
 - Product price and stock cannot be negative; a zero price is allowed.
+- A product SKU cannot be changed after creation.
+- Products are archived rather than permanently deleted. Archived products are hidden from customer-facing lists but retained with their history.
 - Order quantities must be positive whole numbers.
 - Repeated occurrences of the same SKU in one order are combined.
-- Every line is checked before stock changes. If one line is invalid or lacks stock, the entire order is rejected and no stock is reduced.
-- Successful orders reduce stock and save the order, its lines, and inventory updates together.
+- Every line is checked before stock changes. If one line is invalid, archived, or lacks stock, the entire order is rejected and no stock is reduced.
+- Successful orders reduce stock and save the order, its lines, and inventory updates together. Each order line also records an inventory adjustment with reason `Simulated order`.
 - Order lines retain SKU, description, and unit-price snapshots for historical display.
-- A customer cannot bookmark the same product more than once.
+- A customer cannot bookmark the same product more than once. Archived products cannot be bookmarked.
+- Stock changes outside order placement are represented by explicit inventory adjustments carrying a signed quantity change, a required reason, a UTC timestamp, and an actor identifier. The demonstration staff actor is `staff-demo-01`.
+- An adjustment must not be zero and must not cause stock to become negative. Invalid reasons or actors fail before stock changes.
 - Prices use `decimal`. No currency symbol is shown because a demonstration currency has not been chosen.
 
 ### Seed catalogue
@@ -72,4 +81,4 @@ For an isolated development run, set `RETAILLAB_DATA_DIRECTORY` to another direc
 
 ## Scope boundaries
 
-No website, desktop UI, authentication, real payment processing, synchronization, or product-management interface is implemented yet. Concurrency protection for several simultaneous customers is deferred until a multi-user interface is introduced.
+No website, desktop UI, authentication, real payment processing, or synchronization is implemented yet. Product management runs in the console; the WPF staff application remains a later slice. Concurrency protection for several simultaneous customers is deferred until a multi-user interface is introduced.

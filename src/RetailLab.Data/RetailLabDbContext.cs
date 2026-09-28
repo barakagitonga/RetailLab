@@ -13,6 +13,8 @@ public sealed class RetailLabDbContext(DbContextOptions<RetailLabDbContext> opti
 
     public DbSet<OrderLine> OrderLines => Set<OrderLine>();
 
+    public DbSet<InventoryAdjustment> InventoryAdjustments => Set<InventoryAdjustment>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(RetailLabDbContext).Assembly);

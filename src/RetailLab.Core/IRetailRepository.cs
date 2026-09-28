@@ -2,9 +2,19 @@ namespace RetailLab.Core;
 
 public interface IRetailRepository
 {
-    Task<IReadOnlyList<Product>> GetProductsAsync(CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<Product>> GetProductsAsync(
+        bool includeArchived = false,
+        CancellationToken cancellationToken = default);
 
     Task<Product?> FindProductBySkuAsync(string sku, CancellationToken cancellationToken = default);
+
+    void AddProduct(Product product);
+
+    void AddInventoryAdjustment(InventoryAdjustment adjustment);
+
+    Task<IReadOnlyList<InventoryAdjustment>> GetAdjustmentsAsync(
+        Guid productId,
+        CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<Bookmark>> GetBookmarksAsync(
         string customerIdentifier,

@@ -29,6 +29,8 @@ public sealed class Product
 
         Price = price;
         StockQuantity = stockQuantity;
+        IsArchived = false;
+        ArchivedAtUtc = null;
     }
 
     public Guid Id { get; private set; }
@@ -41,6 +43,65 @@ public sealed class Product
 
     public int StockQuantity { get; private set; }
 
+    public bool IsArchived { get; private set; }
+
+    public DateTimeOffset? ArchivedAtUtc { get; private set; }
+
+    public void UpdateDetails(string description, decimal price)
+    {
+        if (IsArchived)
+        {
+            throw new BusinessRuleException(
+                $"Product {Sku} is archived. Unarchive it before updating details.");
+        }
+
+        if (price < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(price), "Price cannot be negative.");
+        }
+
+        Description = NormalizeRequired(description, MaximumDescriptionLength, nameof(description));
+        Price = price;
+    }
+
+    public void Archive(DateTimeOffset archivedAtUtc)
+    {
+        if (IsArchived)
+        {
+            throw new BusinessRuleException($"Product {Sku} is already archived.");
+        }
+
+        IsArchived = true;
+        ArchivedAtUtc = archivedAtUtc.ToUniversalTime();
+    }
+
+    public void Unarchive()
+    {
+        if (!IsArchived)
+        {
+            throw new BusinessRuleException($"Product {Sku} is not archived.");
+        }
+
+        IsArchived = false;
+        ArchivedAtUtc = null;
+    }
+
+    public void AdjustStock(int delta)
+    {
+        if (delta == 0)
+        {
+            throw new BusinessRuleException("Stock adjustment must not be zero.");
+        }
+
+        if (StockQuantity + delta < 0)
+        {
+            throw new BusinessRuleException(
+                $"Insufficient stock for {Sku}. Requested {-delta}, but only {StockQuantity} available.");
+        }
+
+        StockQuantity += delta;
+    }
+
     public void ReduceStock(int quantity)
     {
         if (quantity <= 0)
@@ -48,13 +109,7 @@ public sealed class Product
             throw new ArgumentOutOfRangeException(nameof(quantity), "Order quantity must be greater than zero.");
         }
 
-        if (quantity > StockQuantity)
-        {
-            throw new BusinessRuleException(
-                $"Insufficient stock for {Sku}. Requested {quantity}, but only {StockQuantity} available.");
-        }
-
-        StockQuantity -= quantity;
+        AdjustStock(-quantity);
     }
 
     private static string NormalizeRequired(string value, int maximumLength, string parameterName)
