@@ -90,8 +90,6 @@ Completed: persistent console retail flow, staff product and inventory managemen
 
 ## Screenshots
 
-> Clean screenshots are still to be captured; the images below will appear once saved at the listed paths.
-
 ![RetailLab home page](docs/images/home.png)
 ![RetailLab product catalogue](docs/images/catalogue.png)
 ![RetailLab product details](docs/images/product-details.png)
