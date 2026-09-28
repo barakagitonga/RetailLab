@@ -28,11 +28,13 @@ Implemented safeguards include a Core-owned active-only catalogue service, web d
 
 ## 4. Customer accounts and favourites
 
-Proposed outcome: customers can register, sign in, and maintain isolated favourites.
+Status: implemented in `RetailLab.Web` with auth storage in `RetailLab.Data` (Tutorial 4).
 
-- Configure framework-managed authentication.
-- Replace the fixed customer label with authenticated identity mapping.
-- Keep credentials outside RetailLab business tables.
+Outcome: customers register and sign in through standard ASP.NET Core Identity with the Entity Framework store, and each account keeps isolated favourites keyed by Identity user id.
+
+- Standard Identity authentication: `AddIdentity` with `AddEntityFrameworkStores`; credentials live only in the framework-managed `AspNet*` tables.
+- Anonymous catalogue/product pages show "Sign in to save" with a safe local return URL; signed-in customers get Add/Remove POST forms on the fully `[Authorize]` Favourites page with Post-Redirect-Get notices.
+- Safeguards: `[Authorize]` challenges before any mutation, `Url.IsLocalUrl` on every return URL with known fallbacks, forged POSTs never replayed, plus automated isolation, redirect-policy, and standard Identity account tests.
 
 ## 5. Web simulated ordering
 

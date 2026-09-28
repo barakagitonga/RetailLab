@@ -38,6 +38,39 @@ public sealed class BookmarkServiceTests
     }
 
     [Fact]
+    public async Task GetBookmarksAsync_IsolatesTwoCustomersSharingOneProduct()
+    {
+        var product = new Product("SKU-1", "Product", 10m, 2);
+        var repository = new InMemoryRetailRepository(product);
+        var service = new BookmarkService(repository, new TestTimeProvider(Now));
+
+        await service.AddAsync("customer-a", "SKU-1");
+        await service.AddAsync("customer-b", "SKU-1");
+
+        Assert.Single(await service.GetBookmarksAsync("customer-a"));
+        Assert.Single(await service.GetBookmarksAsync("customer-b"));
+
+        await service.RemoveAsync("customer-a", "SKU-1");
+
+        Assert.Empty(await service.GetBookmarksAsync("customer-a"));
+        Assert.Single(await service.GetBookmarksAsync("customer-b"));
+        Assert.Equal(3, repository.SaveCount);
+    }
+
+    [Fact]
+    public async Task GetBookmarksAsync_NormalizesCustomerIdentifier()
+    {
+        var product = new Product("SKU-1", "Product", 10m, 2);
+        var repository = new InMemoryRetailRepository(product);
+        var service = new BookmarkService(repository, new TestTimeProvider(Now));
+        await service.AddAsync("customer-1", "SKU-1");
+
+        var found = await service.GetBookmarksAsync("  customer-1  ");
+
+        Assert.Single(found);
+    }
+
+    [Fact]
     public async Task RemoveAsync_RemovesExistingBookmark()
     {
         var product = new Product("SKU-1", "Product", 10m, 2);

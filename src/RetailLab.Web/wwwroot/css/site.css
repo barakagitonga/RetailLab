@@ -210,6 +210,127 @@ nav[aria-label="Breadcrumb"] {
     }
 }
 
+.header-auth {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-left: auto;
+}
+
+.header-auth a {
+    color: #fff;
+    text-decoration: none;
+}
+
+.header-auth a:hover,
+.header-auth a:focus-visible {
+    text-decoration: underline;
+}
+
+.greeting {
+    font-size: 0.9rem;
+}
+
+.logout-form {
+    margin: 0;
+}
+
+.logout-form button {
+    background: transparent;
+    border: 1px solid #fff;
+    border-radius: 6px;
+    color: #fff;
+    cursor: pointer;
+    font: inherit;
+    font-size: 0.9rem;
+    padding: 0.25rem 0.75rem;
+}
+
+.logout-form button:hover {
+    background: rgba(255, 255, 255, 0.15);
+}
+
+.notice {
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 0.75rem 1rem;
+    margin: 0 0 1rem;
+}
+
+.notice-success {
+    border-color: var(--accent-dark);
+    background: #ecfdf5;
+    color: #065f46;
+}
+
+.notice-error {
+    border-color: var(--warn);
+    background: #fffbeb;
+    color: var(--warn);
+}
+
+.field {
+    margin-bottom: 1rem;
+    max-width: 28rem;
+}
+
+.field label {
+    display: block;
+    font-weight: bold;
+    margin-bottom: 0.25rem;
+}
+
+.field input:not([type="checkbox"]) {
+    display: block;
+    width: 100%;
+    font: inherit;
+    padding: 0.5rem;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+}
+
+.field-inline {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.field-inline label {
+    margin-bottom: 0;
+    font-weight: normal;
+}
+
+.field span,
+.validation-summary-errors {
+    color: var(--warn);
+}
+
+.card form {
+    margin-top: 0.75rem;
+}
+
+.card button,
+main form button:not(.button) {
+    font: inherit;
+    cursor: pointer;
+    background: var(--wash);
+    border: 1px solid var(--accent-dark);
+    border-radius: 6px;
+    color: var(--accent-dark);
+    padding: 0.4rem 0.9rem;
+}
+
+.card button:hover,
+main form button:not(.button):hover {
+    background: #e6ebe2;
+}
+
+button.button {
+    border: none;
+    cursor: pointer;
+    font: inherit;
+}
+
 @media (prefers-reduced-motion: reduce) {
     * {
         transition: none;

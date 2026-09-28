@@ -12,6 +12,8 @@ RetailLab is a demonstration and teaching codebase. It is not production-ready a
 - **Responsive Razor Pages catalogue** — a read-only website with a home page, a product catalogue, and product-details pages, styled with locally maintained CSS and no JavaScript framework.
 - **Product details and availability** — prices formatted as USD with customer-friendly availability (`In stock`, `Low stock`, `Out of stock`) instead of exact inventory counts. Archived products are hidden from lists and return 404 when requested directly.
 
+- **Customer accounts and favourites** — visitors register and sign in through framework-managed Identity with cookie sign-in (credentials live in framework-managed Identity tables, never in business tables). Each account keeps isolated favourites: anonymous pages show a "Sign in to save" link, signed-in customers get Add/Remove forms, and every change follows Post-Redirect-Get with friendly notices.
+
 ## Technology stack
 
 | Area | Choice |
@@ -48,9 +50,9 @@ Browser / Console
 | Project | Role |
 | --- | --- |
 | `src/RetailLab.Core` | Business entities (`Product`, `Order`, `Bookmark`, `InventoryAdjustment`), validation, and services (`OrderService`, `ProductService`, `InventoryService`, `BookmarkService`, `CatalogService`). Has no dependency on UI frameworks or Entity Framework Core. |
-| `src/RetailLab.Data` | EF Core `DbContext`, entity mappings, the `EfRetailRepository` implementation, migrations, and idempotent seed data. |
+| `src/RetailLab.Data` | EF Core `DbContext`, entity mappings, the `EfRetailRepository` implementation, the standard Identity EF Core store (`AspNetUsers` and related framework tables), migrations, and idempotent seed data. |
 | `src/RetailLab.LabCli` | Console application hosting the persistent retail workflow and the staff product/inventory workflow. |
-| `src/RetailLab.Web` | Read-only Razor Pages catalogue website. PageModels call `CatalogService` and render web-only display models; markup never touches entities. |
+| `src/RetailLab.Web` | Razor Pages storefront: catalogue plus Identity-backed customer accounts and per-customer favourites. PageModels call Core services and render web-only display models; markup never touches entities. |
 | `tests/RetailLab.Tests` | xUnit suite: Core unit tests, Web display tests, and SQLite integration tests. |
 
 ## Getting started
@@ -76,17 +78,17 @@ Both the console and the website use a local SQLite file. By default it lives at
 ## Limitations
 
 - Commerce is simulated: no real ordering checkout, no real payment processing.
-- No authentication: the console uses fixed demo labels (`customer-demo-001`, `staff-demo-01`) and the website is read-only.
+- No staff login yet: the console uses fixed demo labels (`customer-demo-001`, `staff-demo-01`); only web customers have real accounts so far.
 - No synchronization between installations.
 - SQLite is a development and offline-demonstration choice, not a multi-user server database.
 
 ## Roadmap
 
-Completed: persistent console retail flow, staff product and inventory management with audit history, and the customer catalogue website. Planned next slices: customer accounts and favourites, web simulated ordering, a local WPF staff application with offline storage, and desktop/server synchronization. Details live in [docs/ROADMAP.md](docs/ROADMAP.md); decisions are logged in [docs/DECISIONS.md](docs/DECISIONS.md).
+Completed: persistent console retail flow, staff product and inventory management with audit history, the customer catalogue website, and customer accounts with isolated favourites. Planned next slices: web simulated ordering, a local WPF staff application with offline storage, and desktop/server synchronization. Details live in [docs/ROADMAP.md](docs/ROADMAP.md); decisions are logged in [docs/DECISIONS.md](docs/DECISIONS.md).
 
 ## Testing
 
-`dotnet test RetailLab.sln` — observed result: **59 tests, 0 failed** (Core unit tests, Web display tests, and SQLite integration tests, including migration, archive-visibility, and audit-history coverage).
+`dotnet test RetailLab.sln` — observed result: **78 tests, 0 failed** (Core unit tests, Web display and redirect-policy tests, and SQLite integration tests, including migration, archive-visibility, audit-history, two-customer isolation, and standard Identity account coverage: hashing, sign-in, generic credential errors, and lockout).
 
 ## Screenshots
 
