@@ -46,7 +46,7 @@ The fixed customer identifier is `customer-demo-001`. It is only a label and is 
 - Every line is checked before stock changes. If one line is invalid, archived, or lacks stock, the entire order is rejected and no stock is reduced.
 - Successful orders reduce stock and save the order, its lines, and inventory updates together. Each order line also records an inventory adjustment with reason `Simulated order`.
 - Order lines retain SKU, description, and unit-price snapshots for historical display.
-- A customer cannot bookmark the same product more than once. Archived products cannot be bookmarked.
+- A customer cannot bookmark the same product more than once. Archived products cannot be bookmarked, and bookmarks of newly archived products disappear from customer bookmark lists.
 - Stock changes outside order placement are represented by explicit inventory adjustments carrying a signed quantity change, a required reason, a UTC timestamp, and an actor identifier. The demonstration staff actor is `staff-demo-01`.
 - An adjustment must not be zero and must not cause stock to become negative. Invalid reasons or actors fail before stock changes.
 - Prices use `decimal`. No currency symbol is shown because a demonstration currency has not been chosen.
@@ -79,6 +79,29 @@ By default the database is stored at:
 
 For an isolated development run, set `RETAILLAB_DATA_DIRECTORY` to another directory before starting the application.
 
+## Tutorial 3: customer catalogue website
+
+Status: implemented in `RetailLab.Web` (ASP.NET Core Razor Pages).
+
+Customers visit a polished home page under the temporary store name **RetailLab**, browse active products, and open product details. The website shares the same SQLite database and migration initializer as the console, so both deliberately use one local demonstration database via `RETAILLAB_DATA_DIRECTORY`.
+
+- Routes: `/` (home with a catalogue preview of the first few products), `/Products` (full catalogue), `/Products/{sku}` (details).
+- Prices format as USD (for example `$24.95`).
+- Availability shows customer-friendly bands instead of exact counts: `In stock`, `Low stock` (5 or fewer), `Out of stock`.
+- Archived products are absent from lists and return 404 when requested directly, identical to an unknown SKU.
+- The single Core description serves as the product display name; this slice invents no extra product copy.
+- Responsive, accessible server-rendered HTML with locally maintained CSS. No JavaScript framework.
+
+### Running the website
+
+From the repository root:
+
+```powershell
+dotnet run --project src/RetailLab.Web
+```
+
+Then open the printed `http://localhost:XXXX` URL in a browser. To share a demonstration database with the console, set `RETAILLAB_DATA_DIRECTORY` to the same directory for both processes.
+
 ## Scope boundaries
 
-No website, desktop UI, authentication, real payment processing, or synchronization is implemented yet. Product management runs in the console; the WPF staff application remains a later slice. Concurrency protection for several simultaneous customers is deferred until a multi-user interface is introduced.
+No desktop UI, authentication, favourites, ordering, staff administration, synchronization, search, pagination, deployment, or SaaS tenancy is implemented yet. The website is read-only. Concurrency protection for several simultaneous customers is deferred until a multi-user ordering interface is introduced.

@@ -1,3 +1,4 @@
+using System.Globalization;
 using RetailLab.Core;
 using RetailLab.Data;
 
@@ -337,9 +338,9 @@ public sealed class ConsoleRetailApp(
     {
         Console.Write(prompt);
         var value = Console.ReadLine();
-        if (!decimal.TryParse(value, out var parsed))
+        if (!decimal.TryParse(value, NumberStyles.Number, CultureInfo.InvariantCulture, out var parsed))
         {
-            throw new ArgumentException("A numeric price was expected.");
+            throw new ArgumentException("A numeric price was expected (for example 9.99).");
         }
 
         return parsed;

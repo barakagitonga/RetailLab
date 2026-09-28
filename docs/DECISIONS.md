@@ -12,7 +12,7 @@ Develop RetailLab as both a learning project and a portfolio demonstration using
 
 Status: established and partly implemented.
 
-Use .NET 10, C#, ASP.NET Core with Razor Pages, WPF, Entity Framework Core, SQLite, xUnit, and Git. Lab Prototype 1 implements the console, Core, EF Core SQLite, migrations, and xUnit portions. Web and WPF remain future work.
+Use .NET 10, C#, ASP.NET Core with Razor Pages, WPF, Entity Framework Core, SQLite, xUnit, and Git. Tutorials 1 and 2 implement the console, Core, EF Core SQLite, migrations, and xUnit portions; Tutorial 3 adds the Razor Pages catalogue. WPF remains future work.
 
 ## D003 - Separate business rules, storage, and presentation
 
@@ -71,11 +71,17 @@ Consequences:
 - Order placement and staff adjustments share the same transactional stock-plus-audit pattern.
 - Historic order-driven stock changes before this slice have no adjustment rows.
 
+## D009 - Read-only Razor Pages customer catalogue
+
+Status: approved and implemented (Tutorial 3).
+
+Create `RetailLab.Web` with home, catalogue, and product-details pages over the existing Core and Data layers, sharing the same SQLite database and migration initializer as the console. `CatalogService` in Core owns the active-only lookup invariant; the Web-only `CatalogDisplayMapper` owns USD formatting and availability bands (`Out of stock` at 0, `Low stock` at 1-5, `In stock` above), keeping Core locale-free per D006. Razor views bind only to display models. Archived and unknown SKUs return the same 404. The home page shows a "catalogue preview" (first few products) since no featured-product rule exists. The single Core description is used honestly as the display name; no schema change was made for copy. No TestServer package: automated coverage is unit plus SQLite tests, with Razor compile errors caught by `dotnet build`. The test project references Web one-way for display tests. Runtime database files are git-ignored; the repository never stores them.
+
 ## Open decisions
 
 | Question | Resolve before |
 | --- | --- |
-| Demonstration retailer, currency, and price display conventions | Customer-facing catalogue |
+| Permanent retailer brand and multi-currency support (Tutorial 3 uses temporary name RetailLab and USD-at-edge) | Storefront hardening |
 | Stock adjustment reason taxonomy (free text vs enum) and actor roles | Protected web workflows |
 | Authentication implementation and staff/customer permissions | Protected web workflows |
 | Concurrency strategy and duplicate submission handling | Multi-user ordering |

@@ -1,0 +1,26 @@
+@page
+@model RetailLab.Web.Pages.ProductsModel
+@{
+    ViewData["Title"] = "Catalogue";
+}
+
+<h1>Catalogue</h1>
+
+@if (Model.Products.Count == 0)
+{
+    <p>No products are available right now. Please check back later.</p>
+}
+else
+{
+    <ul class="cards">
+        @foreach (var product in Model.Products)
+        {
+            <li class="card">
+                <h2><a asp-page="/Product" asp-route-sku="@product.Sku">@product.Description</a></h2>
+                <p class="sku">Product code: @product.Sku</p>
+                <p class="price">@product.PriceDisplay</p>
+                <p class="availability @product.AvailabilityTone">@product.Availability</p>
+            </li>
+        }
+    </ul>
+}

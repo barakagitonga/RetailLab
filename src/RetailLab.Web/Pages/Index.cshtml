@@ -1,0 +1,33 @@
+@page
+@model RetailLab.Web.Pages.IndexModel
+@{
+    ViewData["Title"] = "Home";
+}
+
+<section class="hero" aria-labelledby="hero-heading">
+    <h1 id="hero-heading">Welcome to RetailLab</h1>
+    <p>A small demonstration store. Browse the catalogue and inspect product details.</p>
+    <p><a class="button" asp-page="/Products">Browse the catalogue</a></p>
+</section>
+
+<section aria-labelledby="preview-heading">
+    <h2 id="preview-heading">Catalogue preview</h2>
+    @if (Model.Preview.Count == 0)
+    {
+        <p>No products are available right now. Please check back later.</p>
+    }
+    else
+    {
+        <ul class="cards">
+            @foreach (var product in Model.Preview)
+            {
+                <li class="card">
+                    <h3><a asp-page="/Product" asp-route-sku="@product.Sku">@product.Description</a></h3>
+                    <p class="sku">Product code: @product.Sku</p>
+                    <p class="price">@product.PriceDisplay</p>
+                    <p class="availability @product.AvailabilityTone">@product.Availability</p>
+                </li>
+            }
+        </ul>
+    }
+</section>
