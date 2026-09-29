@@ -8,6 +8,8 @@ internal sealed class InMemoryRetailRepository(params Product[] products) : IRet
 
     public List<Bookmark> Bookmarks { get; } = [];
 
+    public List<BasketItem> BasketItems { get; } = [];
+
     public List<Order> Orders { get; } = [];
 
     public List<InventoryAdjustment> Adjustments { get; } = [];
@@ -74,6 +76,40 @@ internal sealed class InMemoryRetailRepository(params Product[] products) : IRet
     public void AddBookmark(Bookmark bookmark) => Bookmarks.Add(bookmark);
 
     public void RemoveBookmark(Bookmark bookmark) => Bookmarks.Remove(bookmark);
+
+    public Task<IReadOnlyList<BasketItem>> GetBasketItemsAsync(
+        string customerIdentifier,
+        CancellationToken cancellationToken = default)
+    {
+        // Mirrors the EF query: product-including, ordered by SKU, with no
+        // archived-product filter so retained archived lines stay visible.
+        return Task.FromResult<IReadOnlyList<BasketItem>>(
+            BasketItems
+                .Where(item => item.CustomerIdentifier == customerIdentifier)
+                .OrderBy(item => item.Product.Sku)
+                .ToList());
+    }
+
+    public Task<BasketItem?> FindBasketItemAsync(
+        string customerIdentifier,
+        Guid productId,
+        CancellationToken cancellationToken = default)
+    {
+        return Task.FromResult(
+            BasketItems.SingleOrDefault(
+                item => item.CustomerIdentifier == customerIdentifier &&
+                        item.ProductId == productId));
+    }
+
+    public void AddBasketItem(BasketItem item) => BasketItems.Add(item);
+
+    public void RemoveBasketItem(BasketItem item) => BasketItems.Remove(item);
+
+    public Task SaveBasketChangesAsync(CancellationToken cancellationToken = default)
+    {
+        SaveCount++;
+        return Task.CompletedTask;
+    }
 
     public void AddOrder(Order order) => Orders.Add(order);
 

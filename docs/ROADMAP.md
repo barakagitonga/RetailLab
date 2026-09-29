@@ -38,10 +38,23 @@ Outcome: customers register and sign in through standard ASP.NET Core Identity w
 
 ## 5. Web simulated ordering
 
-Proposed outcome: an authenticated customer can submit an order and view confirmation and history.
+### 5A. Customer basket
+
+Status: implemented in `RetailLab.Web` with basket storage in `RetailLab.Data` (Tutorial 5A).
+
+Outcome: a signed-in customer can add catalogue products to a persistent per-account basket (one per catalogue card, chosen quantities on the product page), edit quantities and remove lines on the basket page, and see line totals, a basket total, and the existing availability bands.
+
+- Core-owned rules: `BasketService` validates unknown and archived products, quantities, and merge overflow as `BusinessRuleException`; `BasketItem` carries a `Version` optimistic-concurrency token.
+- No inventory reservation: out-of-stock products stay addable and retained; checkout enforces stock in 5B. No checkout button yet — a neutral note says stock and prices are confirmed when ordering.
+- Persistence conflicts (concurrent first-add key collisions, stale `Version` losses) translate inside Data to the Core-owned `BasketConflictException`, shown as a friendly retry notice; Web never sees EF exception types.
+- Safeguards: fully `[Authorize]` basket page, account isolation, archived lines visible but only removable, `Url.IsLocalUrl` return-URL checks with product/catalogue/basket fallbacks, Post-Redirect-Get with TempData notices, antiforgery on every form, an additive migration, and automated Core, SQLite (including deterministic conflict-translation), and display tests.
+
+### 5B. Web checkout
+
+Proposed outcome: an authenticated customer can submit the basket as an order and view confirmation and history.
 
 - Reuse the Core ordering behavior demonstrated by Lab Prototype 1.
-- Add duplicate-submission and concurrent-stock protection.
+- Enforce stock and prices at order time, with duplicate-submission and idempotency protection.
 - Continue to exclude real payment processing.
 
 ## 6. Local staff inventory application

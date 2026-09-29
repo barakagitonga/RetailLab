@@ -12,6 +12,8 @@ public sealed class RetailLabDbContext(DbContextOptions<RetailLabDbContext> opti
 
     public DbSet<Bookmark> Bookmarks => Set<Bookmark>();
 
+    public DbSet<BasketItem> BasketItems => Set<BasketItem>();
+
     public DbSet<Order> Orders => Set<Order>();
 
     public DbSet<OrderLine> OrderLines => Set<OrderLine>();

@@ -57,4 +57,23 @@ public sealed class CatalogDisplayMapper
             IsOutOfStock = product.StockQuantity <= 0
         };
     }
+
+    public BasketLine ToBasketLine(BasketItem item)
+    {
+        ArgumentNullException.ThrowIfNull(item);
+        ArgumentNullException.ThrowIfNull(item.Product);
+
+        var product = item.Product;
+        return new BasketLine
+        {
+            Sku = product.Sku,
+            Description = product.Description,
+            PriceDisplay = FormatPrice(product.Price),
+            Availability = AvailabilityFor(product.StockQuantity),
+            AvailabilityTone = AvailabilityToneFor(product.StockQuantity),
+            Quantity = item.Quantity,
+            LineTotalDisplay = FormatPrice(product.Price * item.Quantity),
+            IsArchived = product.IsArchived
+        };
+    }
 }

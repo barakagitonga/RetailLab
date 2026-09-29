@@ -1,3 +1,4 @@
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using RetailLab.Core;
 
@@ -5,6 +6,11 @@ namespace RetailLab.Data;
 
 public sealed class EfRetailRepository(RetailLabDbContext dbContext) : IRetailRepository
 {
+    // SQLite extended result codes (https://www.sqlite.org/rescode.html), named
+    // so the conflict translation reads without magic numbers.
+    private const int SqliteConstraintPrimaryKey = 1555; // SQLITE_CONSTRAINT_PRIMARYKEY
+    private const int SqliteConstraintUnique = 2067; // SQLITE_CONSTRAINT_UNIQUE
+
     public async Task<IReadOnlyList<Product>> GetProductsAsync(
         bool includeArchived = false,
         CancellationToken cancellationToken = default)
@@ -90,6 +96,79 @@ public sealed class EfRetailRepository(RetailLabDbContext dbContext) : IRetailRe
     {
         dbContext.Bookmarks.Remove(bookmark);
     }
+
+    public async Task<IReadOnlyList<BasketItem>> GetBasketItemsAsync(
+        string customerIdentifier,
+        CancellationToken cancellationToken = default)
+    {
+        // One product-including query, deliberately without an archived-product
+        // filter: archived products stay in the basket so the customer can see
+        // and remove them.
+        return await dbContext.BasketItems
+            .AsNoTracking()
+            .Include(item => item.Product)
+            .Where(item => item.CustomerIdentifier == customerIdentifier)
+            .OrderBy(item => item.Product.Sku)
+            .ToListAsync(cancellationToken);
+    }
+
+    public Task<BasketItem?> FindBasketItemAsync(
+        string customerIdentifier,
+        Guid productId,
+        CancellationToken cancellationToken = default)
+    {
+        return dbContext.BasketItems.SingleOrDefaultAsync(
+            item => item.CustomerIdentifier == customerIdentifier &&
+                   item.ProductId == productId,
+            cancellationToken);
+    }
+
+    public void AddBasketItem(BasketItem item)
+    {
+        dbContext.BasketItems.Add(item);
+    }
+
+    public void RemoveBasketItem(BasketItem item)
+    {
+        dbContext.BasketItems.Remove(item);
+    }
+
+    public async Task SaveBasketChangesAsync(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException exception)
+        {
+            // A stale Version lost the optimistic-concurrency check: another
+            // request changed the basket first, so the customer retries
+            // against the current basket.
+            throw new BasketConflictException(exception);
+        }
+        catch (DbUpdateException exception) when (IsConcurrentBasketInsert(exception))
+        {
+            throw new BasketConflictException(exception);
+        }
+    }
+
+    /// <summary>
+    /// True only for the expected race: two requests simultaneously adding the
+    /// same basket line collide on its key. Anything else (check violations,
+    /// foreign keys, unrelated entities) skips translation and propagates to
+    /// the normal unexpected-error handling.
+    /// </summary>
+    private static bool IsConcurrentBasketInsert(DbUpdateException exception) =>
+        IsKeyCollision(exception.InnerException) && HasOnlyAddedBasketItems(exception);
+
+    private static bool IsKeyCollision(Exception? innerException) =>
+        innerException is SqliteException sqlite &&
+        sqlite.SqliteExtendedErrorCode is SqliteConstraintPrimaryKey or SqliteConstraintUnique;
+
+    private static bool HasOnlyAddedBasketItems(DbUpdateException exception) =>
+        exception.Entries.Count > 0 &&
+        exception.Entries.All(entry =>
+            entry.State == EntityState.Added && entry.Entity is BasketItem);
 
     public void AddOrder(Order order)
     {

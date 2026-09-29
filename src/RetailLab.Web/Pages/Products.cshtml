@@ -38,10 +38,17 @@ else
                             <button type="submit">Add to favourites</button>
                         </form>
                     }
+                    <form method="post" asp-page="/Basket" asp-page-handler="Add">
+                        <input type="hidden" name="sku" value="@product.Sku" />
+                        <input type="hidden" name="quantity" value="1" />
+                        <input type="hidden" name="returnUrl" value="@Request.Path" />
+                        <button type="submit">Add to basket</button>
+                    </form>
                 }
                 else
                 {
-                    <a asp-page="/Account/Login" asp-route-returnUrl="@Request.Path">Sign in to save</a>
+                    <p><a asp-page="/Account/Login" asp-route-returnUrl="@Request.Path">Sign in to save</a></p>
+                    <p><a asp-page="/Account/Login" asp-route-returnUrl="@Request.Path">Sign in to add to basket</a></p>
                 }
             </li>
         }
