@@ -118,6 +118,25 @@ Customers register and sign in with an email and password. Authentication is fra
 
 Run the website, register `anna@example.com`, save a favourite, then register `bob@example.com` in a private window: Bob's favourites start empty while Anna's remain intact. To re-run the demonstration from scratch, point `RETAILLAB_DATA_DIRECTORY` at a fresh empty folder before starting.
 
+## Tutorial 5A: customer basket
+
+Status: implemented in `RetailLab.Web` with basket storage in `RetailLab.Data`.
+
+Signed-in customers keep a persistent per-account basket. Catalogue cards add one item per click, the product page offers a quantity field, and the basket page edits quantities, removes lines, and shows line totals plus a basket total with the existing availability bands.
+
+- Routes: `/Basket` (all basket mutations), plus add controls on `/Products` and `/Products/{sku}`.
+- Anonymous visitors see a "Sign in to add to basket" link carrying a safe local return URL. After login they land back on the originating page and explicitly press Add; signing in never adds anything by itself.
+- Signed-in customers post to the fully `[Authorize]` Basket page. Every POST redirects (Post-Redirect-Get) with a friendly TempData notice, so refreshing never resubmits.
+- Submitted return URLs are validated with `Url.IsLocalUrl`. Add falls back to the matching product page (or catalogue); Update and Remove fall back to `/Basket`.
+- Updating a quantity to zero is rejected with a message pointing at the separate Remove action.
+- The basket reserves no inventory: out-of-stock products can be added and retained, and a neutral note explains that stock and prices are confirmed when ordering. There is no checkout button yet.
+- Archived products already in the basket stay visible with a "No longer available" note; only removal works for them.
+- Simultaneous requests never corrupt the basket: a conflicting change shows "Your basket changed; please try again." instead of an error page.
+
+### Trying the basket
+
+Run the website, register an account, add products from the catalogue and a product page, then open Basket from the header: edit a quantity, try zero to see the friendly rejection, and remove a line. To re-run from scratch, point `RETAILLAB_DATA_DIRECTORY` at a fresh empty folder before starting.
+
 ## Scope boundaries
 
-No desktop UI, ordering, staff administration, synchronization, search, pagination, deployment, or SaaS tenancy is implemented yet. The website has customer accounts and favourites but no checkout. Concurrency protection for several simultaneous customers is deferred until a multi-user ordering interface is introduced.
+No desktop UI, ordering, staff administration, synchronization, search, pagination, deployment, or SaaS tenancy is implemented yet. The website has customer accounts, favourites, and a basket, but no checkout. Basket conflicts already translate to friendly retries; checkout idempotency is deferred until the multi-user ordering interface (Tutorial 5B).

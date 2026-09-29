@@ -93,6 +93,22 @@ Consequences:
 - The `AspNet*` tables arrive through an additive migration; existing business data is untouched.
 - Two-customer isolation, redirect fallbacks, and the standard Identity account flows (hashing, sign-in, generic credential errors, lockout) are covered by automated tests.
 
+## D011 - Customer basket without reservation, with persistence-conflict translation
+
+Status: approved and implemented (Tutorial 5A).
+
+Each signed-in customer keeps a basket of product lines keyed by Identity user id. `BasketItem` carries a positive quantity plus a `Version` optimistic-concurrency token under the composite key `(CustomerIdentifier, ProductId)`. `BasketService` owns every basket rule — unknown and archived products, quantities, and integer overflow when merging — and reports all customer-correctable failures as `BusinessRuleException`, so PageModels catch one business type plus the conflict type. `EfRetailRepository.SaveBasketChangesAsync` translates expected `DbUpdateException` failures (concurrent first-add key collisions, and stale `Version` losses arriving as `DbUpdateConcurrencyException`) into the Core-owned `BasketConflictException`; the web layer shows "Your basket changed; please try again." and never references EF exception types.
+
+Reason: simultaneous requests must never corrupt the basket or surface HTTP 500. A stale update or delete loses its `Version` check instead of silently overwriting another request, and a concurrent first add collides on the key instead of duplicating the line; both losers retry against the current basket.
+
+Consequences:
+
+- The basket reserves no inventory: out-of-stock products can be added and retained with the existing availability bands, and checkout (Tutorial 5B) enforces stock and prices. No checkout button exists yet; the basket page carries a neutral note that stock and prices are confirmed when ordering.
+- Catalogue cards add one item; quantity selection lives on the product page and quantity editing on the basket page. Updating to zero is rejected with a message pointing at the separate Remove action.
+- Archived lines stay visible with a "No longer available" note; only removal works for them, through the all-products lookup rather than the active-only catalogue.
+- Tutorial 5A has no idempotency keys: Post-Redirect-Get prevents refresh resubmission, but two rapid Add clicks can add twice. This is honest basket behavior for this slice — stock enforcement at checkout means no oversell.
+- No new packages were introduced. The `BasketItems` table arrives through an additive migration; existing business data is untouched.
+
 ## Open decisions
 
 | Question | Resolve before |
@@ -100,5 +116,5 @@ Consequences:
 | Permanent retailer brand and multi-currency support (Tutorial 3 uses temporary name RetailLab and USD-at-edge) | Storefront hardening |
 | Stock adjustment reason taxonomy (free text vs enum) and actor roles | Protected web workflows |
 | Staff permissions and roles (customer password sign-in is done) | Protected web workflows |
-| Concurrency strategy and duplicate submission handling | Multi-user ordering |
+| Checkout idempotency and duplicate-submission handling (basket conflicts already translate per D011) | Multi-user ordering |
 | Server storage, data ownership, synchronization transport, and conflict policy | Synchronization implementation |

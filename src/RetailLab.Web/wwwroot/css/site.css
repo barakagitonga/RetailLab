@@ -331,6 +331,28 @@ button.button {
     font: inherit;
 }
 
+.quantity-field {
+    max-width: 10rem;
+}
+
+.quantity-field input {
+    max-width: 6rem;
+}
+
+.line-total {
+    font-weight: normal;
+    font-size: 0.9rem;
+}
+
+.basket-total {
+    font-size: 1.2rem;
+    font-weight: bold;
+}
+
+.basket-note {
+    color: var(--muted);
+}
+
 @media (prefers-reduced-motion: reduce) {
     * {
         transition: none;

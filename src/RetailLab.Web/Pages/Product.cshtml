@@ -35,10 +35,20 @@ else
                 <button type="submit">Add to favourites</button>
             </form>
         }
+        <form method="post" asp-page="/Basket" asp-page-handler="Add">
+            <input type="hidden" name="sku" value="@Model.Product.Sku" />
+            <input type="hidden" name="returnUrl" value="@Request.Path" />
+            <div class="field quantity-field">
+                <label for="quantity">Quantity</label>
+                <input type="number" id="quantity" name="quantity" value="1" min="1" />
+            </div>
+            <button type="submit">Add to basket</button>
+        </form>
     }
     else
     {
         <p><a asp-page="/Account/Login" asp-route-returnUrl="@Request.Path">Sign in to save</a></p>
+        <p><a asp-page="/Account/Login" asp-route-returnUrl="@Request.Path">Sign in to add to basket</a></p>
     }
     @if (Model.Product.IsOutOfStock)
     {

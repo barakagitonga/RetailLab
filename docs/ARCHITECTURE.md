@@ -11,8 +11,8 @@ All projects target .NET 10 with nullable reference checking and implicit import
 | `src/RetailLab.Core` | Retail entities, validation, business workflows, customer catalogue lookups, and the persistence boundary. It has no EF Core or UI dependency. |
 | `src/RetailLab.Data` | EF Core SQLite context, mappings, repository, migrations, and idempotent sample-data initialization. |
 | `src/RetailLab.LabCli` | Interactive Lab Prototype 1 console interface plus staff product and inventory workflow, and application startup. |
-| `src/RetailLab.Web` | Customer storefront (Razor Pages): home, catalogue, product details, Identity-backed accounts, and per-customer favourites over the same Core and Data layers. |
-| `tests/RetailLab.Tests` | Core unit tests, Web display and redirect-policy tests, and SQLite integration tests (including standard Identity account flows). |
+| `src/RetailLab.Web` | Customer storefront (Razor Pages): home, catalogue, product details, Identity-backed accounts, per-customer favourites, and a per-customer basket over the same Core and Data layers. |
+| `tests/RetailLab.Tests` | Core unit tests, Web display and redirect-policy tests, and SQLite integration tests (including standard Identity account flows and basket persistence conflicts). |
 
 No Desktop project exists yet.
 
@@ -33,6 +33,8 @@ Core therefore remains reusable by later Razor Pages and WPF interfaces without 
 ```text
 Product 1 --------< Bookmark
    |
+   +--------------< BasketItem
+   |
    +--------------< OrderLine >-------- 1 Order
    |
    +--------------< InventoryAdjustment
@@ -40,10 +42,12 @@ Product 1 --------< Bookmark
 
 - `Product` owns SKU (immutable), description, price, stock, archive state, and stock-mutation rules.
 - `Bookmark` joins the fixed simulated customer to a product.
+- `BasketItem` joins a customer to a product with a positive quantity, timestamps, and a `Version` optimistic-concurrency token.
 - `Order` owns its lines and calculates its total.
 - `OrderLine` records product identifiers plus SKU, description, and unit-price snapshots.
 - `InventoryAdjustment` records one stock change with signed quantity delta, resulting quantity, required reason, actor identifier, and UTC timestamp.
 - `BookmarkService` coordinates add/remove behavior and rejects archived products for new bookmarks.
+- `BasketService` owns basket rules (unknown and archived products, quantities, merge overflow) and reports customer-correctable failures as `BusinessRuleException`; expected persistence conflicts surface as the Core-owned `BasketConflictException`.
 - `OrderService` validates a complete request before changing stock, rejects archived products, creates the order, records one `InventoryAdjustment` per line with reason `Simulated order`, and commits through `IRetailRepository`.
 - `ProductService` coordinates product creation, detail updates, archiving, and unarchiving.
 - `InventoryService` validates staff adjustments (including reason and actor) before mutating stock, appends the audit record, and exposes adjustment history.
@@ -62,12 +66,21 @@ Startup resolves the SQLite path exactly like LabCli (`RETAILLAB_DATA_DIRECTORY`
 
 The Favourites PageModel is fully `[Authorize]` with `OnGetAsync`, `OnPostAddAsync`, and `OnPostRemoveAsync` handlers. Anonymous visitors never receive a form: catalogue and product pages render a "Sign in to save" link to `/Account/Login` with the current path as a local return URL. This matters because an anonymous POST would be challenged before its handler runs, and Identity's login return would replay only a GET — so the original POST must never be implied. After login the customer returns to the originating page and explicitly presses Add. Every POST ends in Post-Redirect-Get with a TempData notice rendered by the layout; return URLs pass through `Url.IsLocalUrl` via the unit-tested `FavouriteRedirects` policy (Add falls back to the product page or catalogue, Remove to `/Favourites`).
 
+## Customer basket
+
+The Basket PageModel follows the same shape as Favourites but is fully `[Authorize]` with `OnGetAsync`, `OnPostAddAsync`, `OnPostUpdateAsync`, and `OnPostRemoveAsync` handlers. Catalogue cards post quantity 1, the product page posts the customer's chosen quantity, and the basket page posts quantity edits and removals; anonymous visitors get a "Sign in to add to basket" link instead of forms, for the same never-replay reason. The service owns every rule, so handlers only bind, invoke `BasketService`, map `BusinessRuleException` messages and `BasketConflictException` retries to TempData notices, and redirect. Return URLs pass through the PageModel's private `RedirectToLocal` (`Url.IsLocalUrl`, never the favourites-named helper): Add falls back to the product page or catalogue, Update and Remove to `/Basket`.
+
+Basket lines render through the `BasketLine` display model (unit price, line total, availability band, archived flag) mapped by `CatalogDisplayMapper`, keeping USD formatting out of Core. Archived lines show "No longer available" with removal as the only action. The basket reserves nothing: out-of-stock products stay addable and retained, and a neutral note says stock and prices are confirmed when ordering. There is no checkout button and no header basket count yet.
+
+`SaveBasketChangesAsync` is the only basket commit path: it translates EF `DbUpdateException` failures — concurrent first-add key collisions and stale-`Version` losses — into `BasketConflictException`, so simultaneous requests retry with a friendly notice instead of corrupting the basket or surfacing HTTP 500. There are no idempotency keys: Post-Redirect-Get stops refresh resubmission, but two rapid Add clicks can add twice; checkout (Tutorial 5B) enforces stock, so no oversell follows.
+
 ## Database
 
-`RetailLabDbContext` maps twelve SQLite tables: five RetailLab business tables plus seven framework-managed Identity tables.
+`RetailLabDbContext` maps thirteen SQLite tables: six RetailLab business tables plus seven framework-managed Identity tables.
 
 - `Products`, with a case-insensitive unique SKU, nonnegative price and stock constraints, plus `IsArchived` and nullable `ArchivedAtUtc`.
 - `Bookmarks`, with `(CustomerIdentifier, ProductId)` as its composite primary key. Customer bookmark queries exclude archived products.
+- `BasketItems`, with `(CustomerIdentifier, ProductId)` as its composite primary key, a positive-quantity check constraint, and `Version` as an optimistic-concurrency token. Customer basket queries include products in one query with no archived filter.
 - `Orders`, indexed by customer identifier and placement time.
 - `OrderLines`, with positive-quantity and nonnegative-price constraints.
 - `InventoryAdjustments`, with nonzero quantity-change and nonnegative resulting-quantity constraints, required reason and actor, indexed by product and creation time, referencing products with restricted deletes.
@@ -114,10 +127,21 @@ Browser POST + antiforgery token
     -> TempData notice + 302 redirect (validated return URL or fallback)
 ```
 
+Browser POST (a signed-in basket change):
+
+```text
+Browser POST + antiforgery token
+    -> auth middleware ([Authorize] already passed)
+    -> Basket PageModel -> BasketService (Core rules, user id scoped)
+    -> IRetailRepository.SaveBasketChangesAsync -> EF Core DbContext
+    -> SQLite (key collision or stale Version -> BasketConflictException)
+    -> TempData notice + 302 redirect (validated return URL or fallback)
+```
+
 A successful order tracks stock changes, inventory adjustments, a new order, and all new lines in one DbContext. `SaveChangesAsync` persists them in one relational transaction. A staff adjustment tracks the stock change and its audit record the same way. Invalid or insufficient-stock requests fail before any product is changed; invalid reasons or actors fail before stock is mutated.
 
 The database defaults to `%LOCALAPPDATA%\RetailLab\LabPrototype1\retaillab.db`. The `RETAILLAB_DATA_DIRECTORY` environment variable can select an isolated location for development, and both the console and the website honor it so they can deliberately share one local database.
 
 ## Deferred architecture
 
-Simulated web ordering, staff administration and roles, WPF, multiple concurrent customers, synchronization, search, pagination, deployment, and SaaS tenancy are not implemented yet. Shared models do not imply that future server and offline desktop applications will share one physical database file.
+Web checkout (including checkout idempotency), staff administration and roles, WPF, synchronization, search, pagination, deployment, and SaaS tenancy are not implemented yet. Shared models do not imply that future server and offline desktop applications will share one physical database file.

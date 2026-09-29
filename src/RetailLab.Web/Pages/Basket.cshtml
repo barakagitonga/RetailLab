@@ -1,0 +1,56 @@
+@page
+@model RetailLab.Web.Pages.BasketModel
+@{
+    ViewData["Title"] = "Basket";
+}
+
+<h1>Your basket</h1>
+
+@if (Model.Items.Count == 0)
+{
+    <p>Your basket is empty.</p>
+    <p><a asp-page="/Products">Browse the catalogue</a> to add products to your basket.</p>
+}
+else
+{
+    <ul class="cards">
+        @foreach (var line in Model.Items)
+        {
+            <li class="card">
+                <h2><a asp-page="/Product" asp-route-sku="@line.Sku">@line.Description</a></h2>
+                <p class="sku">Product code: @line.Sku</p>
+                <p class="price">@line.PriceDisplay <span class="line-total">(@line.LineTotalDisplay for @line.Quantity)</span></p>
+                @if (line.IsArchived)
+                {
+                    <p class="availability low">No longer available</p>
+                    <p>This product was removed from the catalogue. Please remove it from your basket.</p>
+                    <form method="post" asp-page="/Basket" asp-page-handler="Remove">
+                        <input type="hidden" name="sku" value="@line.Sku" />
+                        <input type="hidden" name="returnUrl" value="/Basket" />
+                        <button type="submit">Remove</button>
+                    </form>
+                }
+                else
+                {
+                    <p class="availability @line.AvailabilityTone">@line.Availability</p>
+                    <form method="post" asp-page="/Basket" asp-page-handler="Update">
+                        <input type="hidden" name="sku" value="@line.Sku" />
+                        <input type="hidden" name="returnUrl" value="/Basket" />
+                        <div class="field quantity-field">
+                            <label for="quantity-@line.Sku">Quantity</label>
+                            <input type="number" id="quantity-@line.Sku" name="quantity" value="@line.Quantity" min="1" />
+                        </div>
+                        <button type="submit">Update quantity</button>
+                    </form>
+                    <form method="post" asp-page="/Basket" asp-page-handler="Remove">
+                        <input type="hidden" name="sku" value="@line.Sku" />
+                        <input type="hidden" name="returnUrl" value="/Basket" />
+                        <button type="submit">Remove</button>
+                    </form>
+                }
+            </li>
+        }
+    </ul>
+    <p class="basket-total">Basket total: @Model.BasketTotalDisplay</p>
+    <p class="basket-note">Stock and prices are confirmed when you place your order.</p>
+}
