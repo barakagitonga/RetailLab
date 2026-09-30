@@ -150,6 +150,21 @@ Consequences:
 - Product creation, detail editing, archive/unarchive controls, and adjustment-history UI remain later desktop slices.
 - Automated tests continue to cover Core and SQLite behavior; XAML compilation is covered by the solution build, and layout/interaction require a Windows manual check.
 
+## D015 - Desktop adjustment history in a focused window, still without MVVM
+
+Status: approved and implemented (Tutorial 6B).
+
+Open history from the inventory workspace through a `View adjustment history` button that is enabled for the selected product whether active or archived (disabled only when nothing is selected or the main window is busy). The button opens a focused modal `AdjustmentHistoryWindow` owned by the main window; the existing Apply-adjustment control keeps its archived-product restriction unchanged.
+
+Reason: history is a read-only companion to the adjustment workflow, not a new workflow: a separate window keeps the adjustment panel small, shows the selected product and its complete UTC audit trail (newest first) without navigation state, and leaves archived-product history viewable while archived products stay unadjustable. XAML plus focused code-behind remains sufficient: the window only coordinates a fresh DbContext, the existing `InventoryService.GetHistoryAsync`, and display-row mapping, with newest-first sorting as a presentation concern. Introducing an MVVM framework for two windows would add learning surface without demonstrated need; revisit when the desktop application gains several screens or richer shared state.
+
+Consequences:
+
+- Core and Data are unchanged: no schema migration, no business-rule change, no new package.
+- `InventoryAdjustmentRow` keeps WPF formatting (UTC and signed-change display) out of Core and carries no rules.
+- History failures show safe staff-facing text without raw exception details; an empty history shows a friendly empty state.
+- XAML compilation is covered by the solution build; layout and interaction require a Windows manual check.
+
 ## Open decisions
 
 | Question | Resolve before |

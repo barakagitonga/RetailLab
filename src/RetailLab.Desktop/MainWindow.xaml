@@ -116,8 +116,15 @@
                                    Foreground="{StaticResource MutedBrush}"
                                    TextWrapping="Wrap" />
                         <TextBlock x:Name="SelectedStockTextBlock"
-                                   Margin="0,8,0,20"
+                                   Margin="0,8,0,16"
                                    FontWeight="SemiBold" />
+
+                        <Button x:Name="ViewHistoryButton"
+                                Margin="0,0,0,20"
+                                automation:AutomationProperties.Name="View adjustment history"
+                                Content="View adjustment history"
+                                IsEnabled="False"
+                                Click="ViewHistoryButton_Click" />
 
                         <TextBlock Margin="0,0,0,6" FontWeight="SemiBold" Text="Quantity change" />
                         <TextBox x:Name="QuantityChangeTextBox"

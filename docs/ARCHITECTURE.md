@@ -12,7 +12,7 @@ All projects target .NET 10 with nullable reference checking and implicit import
 | `src/RetailLab.Data` | EF Core SQLite context, mappings, repository, migrations, and idempotent sample-data initialization. |
 | `src/RetailLab.LabCli` | Interactive Lab Prototype 1 console interface plus staff product and inventory workflow, and application startup. |
 | `src/RetailLab.Web` | Customer storefront (Razor Pages): home, catalogue, product details, Identity-backed accounts, per-customer favourites, a per-customer basket, and simulated basket checkout with order history over the same Core and Data layers. |
-| `src/RetailLab.Desktop` | Windows WPF staff interface: exact local inventory and one audited stock-adjustment workflow over Core and Data. |
+| `src/RetailLab.Desktop` | Windows WPF staff interface: exact local inventory, one audited stock-adjustment workflow, and read-only adjustment-history viewing over Core and Data. |
 | `tests/RetailLab.Tests` | Core unit tests, Web display and redirect-policy tests, and SQLite integration tests (including standard Identity account flows, basket persistence conflicts, and checkout plus product-concurrency races). |
 
 ## Project dependencies
@@ -31,6 +31,8 @@ Core therefore remains reusable by later Razor Pages and WPF interfaces without 
 ## Desktop layer
 
 `RetailLab.Desktop` is a Windows-only WPF presentation layer. `MainWindow` loads staff-facing `InventoryProductRow` display records, creates a fresh DbContext for each load or adjustment, and calls the existing `InventoryService`. It contains input parsing and status-message presentation, but no stock rule: zero changes, negative-result prevention, archived-product rejection, audit creation, and concurrency protection remain below the UI.
+
+Adjustment-history viewing (Tutorial 6B) follows the same pattern without touching Core or Data: `MainWindow` opens a focused modal `AdjustmentHistoryWindow` owned by the main window for the selected product, active or archived. The history window receives the selected `InventoryProductRow` plus the existing DbContext factory, creates a fresh short-lived DbContext, loads through `InventoryService.GetHistoryAsync`, and maps the result to read-only `InventoryAdjustmentRow` display records. The repository returns oldest-first, so the window sorts newest-first in the presentation layer; an empty result shows a friendly empty state, and failures show safe staff-facing text. No schema, package, or business-rule change was needed.
 
 The first slice intentionally uses XAML plus focused code-behind rather than adding an MVVM framework. This keeps the learning surface small while the code-behind acts only as a presentation coordinator. If the desktop application gains several screens or richer state, a dedicated view-model layer can be introduced based on demonstrated need.
 
@@ -145,6 +147,17 @@ WPF selection + signed quantity + reason
     -> EF Core DbContext
     -> local SQLite (product stock + InventoryAdjustment in one save)
     -> refreshed staff display + status message
+```
+
+Desktop history:
+
+```text
+WPF product selection
+    -> AdjustmentHistoryWindow -> InventoryService.GetHistoryAsync (Core lookup)
+    -> IRetailRepository.GetAdjustmentsAsync
+    -> EF Core DbContext
+    -> local SQLite (read-only product history)
+    -> newest-first staff display rows + empty/error states
 ```
 
 Browser POST (a signed-in favourite change):
