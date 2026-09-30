@@ -12,7 +12,7 @@ All projects target .NET 10 with nullable reference checking and implicit import
 | `src/RetailLab.Data` | EF Core SQLite context, mappings, repository, migrations, and idempotent sample-data initialization. |
 | `src/RetailLab.LabCli` | Interactive Lab Prototype 1 console interface plus staff product and inventory workflow, and application startup. |
 | `src/RetailLab.Web` | Customer storefront (Razor Pages): home, catalogue, product details, Identity-backed accounts, per-customer favourites, a per-customer basket, and simulated basket checkout with order history over the same Core and Data layers. |
-| `src/RetailLab.Desktop` | Windows WPF staff interface: exact local inventory, one audited stock-adjustment workflow, and read-only adjustment-history viewing over Core and Data. |
+| `src/RetailLab.Desktop` | Windows WPF staff interface: exact local inventory, one audited stock-adjustment workflow, read-only adjustment-history viewing, product creation, and explicit inventory refresh over Core and Data. |
 | `tests/RetailLab.Tests` | Core unit tests, Web display and redirect-policy tests, and SQLite integration tests (including standard Identity account flows, basket persistence conflicts, and checkout plus product-concurrency races). |
 
 ## Project dependencies
@@ -33,6 +33,8 @@ Core therefore remains reusable by later Razor Pages and WPF interfaces without 
 `RetailLab.Desktop` is a Windows-only WPF presentation layer. `MainWindow` loads staff-facing `InventoryProductRow` display records, creates a fresh DbContext for each load or adjustment, and calls the existing `InventoryService`. It contains input parsing and status-message presentation, but no stock rule: zero changes, negative-result prevention, archived-product rejection, audit creation, and concurrency protection remain below the UI.
 
 Adjustment-history viewing (Tutorial 6B) follows the same pattern without touching Core or Data: `MainWindow` opens a focused modal `AdjustmentHistoryWindow` owned by the main window for the selected product, active or archived. The history window receives the selected `InventoryProductRow` plus the existing DbContext factory, creates a fresh short-lived DbContext, loads through `InventoryService.GetHistoryAsync`, and maps the result to read-only `InventoryAdjustmentRow` display records. The repository returns oldest-first, so the window sorts newest-first in the presentation layer; an empty result shows a friendly empty state, and failures show safe staff-facing text. No schema, package, or business-rule change was needed.
+
+Product creation and explicit refresh (Tutorial 6C) reuse Core and Data unchanged: a compact action area above the inventory grid offers New product and Refresh inventory. Refresh re-runs the existing load with a fresh DbContext, preserving the selected SKU when it still exists, so description, price, stock, and archive changes made through another interface become visible with correct button availability. New product opens a focused modal `CreateProductWindow` that validates input for immediate friendly feedback, then persists only through `ProductService.CreateAsync`; Core trims values, enforces lengths and nonnegative price/stock, preserves the entered SKU casing, and rejects case-insensitive duplicate SKUs. Initial stock is the product's starting value and creates no inventory-adjustment record. No schema, package, or business-rule change was needed.
 
 The first slice intentionally uses XAML plus focused code-behind rather than adding an MVVM framework. This keeps the learning surface small while the code-behind acts only as a presentation coordinator. If the desktop application gains several screens or richer state, a dedicated view-model layer can be introduced based on demonstrated need.
 
@@ -158,6 +160,17 @@ WPF product selection
     -> EF Core DbContext
     -> local SQLite (read-only product history)
     -> newest-first staff display rows + empty/error states
+```
+
+Desktop product creation:
+
+```text
+WPF creation dialog (SKU, description, price, initial stock)
+    -> ProductService.CreateAsync (Core validation + duplicate check)
+    -> IRetailRepository.SaveProductChangesAsync
+    -> EF Core DbContext
+    -> local SQLite (new product row; no adjustment record)
+    -> refreshed inventory grid with the new product selected
 ```
 
 Browser POST (a signed-in favourite change):

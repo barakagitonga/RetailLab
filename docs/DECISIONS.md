@@ -165,6 +165,22 @@ Consequences:
 - History failures show safe staff-facing text without raw exception details; an empty history shows a friendly empty state.
 - XAML compilation is covered by the solution build; layout and interaction require a Windows manual check.
 
+## D016 - Desktop product creation plus explicit refresh; edit/archive deferred
+
+Status: approved and implemented (Tutorial 6C).
+
+Give the inventory workspace a compact action area with `New product` and `Refresh inventory`. Creation opens a focused modal `CreateProductWindow` (SKU, description, price, initial stock) that validates for immediate friendly feedback and persists only through `ProductService.CreateAsync`; success closes the dialog, refreshes the grid, and selects the new SKU. Refresh re-runs the existing inventory load with a fresh DbContext and preserves the selected SKU when it still exists.
+
+Reason: creation is the next self-contained Core workflow after adjustment and history: one service call, no navigation state, and duplicate-SKU protection already tested. Pairing it with Refresh answers a real multi-interface problem observed in manual testing — the console can change a product while Desktop is open, and Core's concurrency protection keeps data safe but leaves the desktop row stale until reloaded. Editing and archive/unarchive stay deferred because they need harder UX design: stale-form concurrency (another interface changing the product while the form is open) and destructive-action confirmation deserve their own slice (proposed 6D).
+
+Consequences:
+
+- Core and Data are unchanged: no schema migration, no business-rule change, no new package, no MVVM framework.
+- The window passes values through untouched; Core trims, enforces lengths and nonnegative price/stock, preserves SKU casing, and rejects case-insensitive duplicates (NOCASE collation plus a pre-check).
+- Initial stock is a starting value, not an adjustment: creation writes no inventory-adjustment record, matching the existing console behavior.
+- UI prechecks are friendly feedback only; Core remains the final authority, and service-thrown validation maps back to fields without raw messages.
+- XAML compilation is covered by the solution build; creation, duplicate, validation, and refresh flows require a Windows manual check.
+
 ## Open decisions
 
 | Question | Resolve before |
