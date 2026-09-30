@@ -18,7 +18,7 @@ RetailLab is a demonstration and teaching codebase. It is not production-ready a
 
 - **Simulated web checkout** — signed-in customers convert the basket into a simulated order with one atomic save (snapshot lines, stock reduction, audit entries, basket clearing), then view confirmation and order history. Duplicate submissions resolve to the original order, concurrent races retry with friendly notices, and every order surface states that no payment is processed.
 
-- **Offline desktop inventory** — a WPF staff workspace lists exact local stock, including archived products, and records signed stock adjustments with a required reason through the same audited Core workflow used by the console.
+- **Offline desktop inventory** — a WPF staff workspace lists exact local stock, including archived products, , records signed stock adjustments with a required reason through the same audited Core workflow used by the console, and opens a focused read-only window showing the selected product's complete adjustment history (newest first), including for archived products.
 
 ## Technology stack
 
@@ -60,7 +60,7 @@ Browser / Console / WPF
 | `src/RetailLab.Data` | EF Core `DbContext`, entity mappings, the `EfRetailRepository` implementation, the standard Identity EF Core store (`AspNetUsers` and related framework tables), migrations, and idempotent seed data. |
 | `src/RetailLab.LabCli` | Console application hosting the persistent retail workflow and the staff product/inventory workflow. |
 | `src/RetailLab.Web` | Razor Pages storefront: catalogue plus Identity-backed customer accounts, per-customer favourites, a per-customer basket, and simulated checkout with order history. PageModels call Core services and render web-only display models; markup never touches entities. |
-| `src/RetailLab.Desktop` | Windows WPF staff application: exact local inventory plus audited stock adjustments. It coordinates existing Core services and keeps WPF display concerns outside the domain model. |
+| `src/RetailLab.Desktop` | Windows WPF staff application: exact local inventory, audited stock adjustments, and read-only adjustment-history viewing. It coordinates existing Core services and keeps WPF display concerns outside the domain model. |
 | `tests/RetailLab.Tests` | xUnit suite: Core unit tests, Web display tests, and SQLite integration tests. |
 
 ## Getting started
@@ -90,13 +90,13 @@ The console, website, and desktop application use a local SQLite file. By defaul
 
 - Commerce is simulated: web and console checkout share one ordering implementation with no real payment processing.
 - No staff login yet: the console and desktop use fixed demo actor labels; only web customers have real accounts so far.
-- The first desktop slice adjusts stock only; product creation, editing, archive controls, and adjustment history remain in the console for now.
+- The desktop application adjusts stock and views adjustment history; product creation, editing, and archive controls remain in the console for now.
 - No synchronization between installations.
 - SQLite is a development and offline-demonstration choice, not a multi-user server database.
 
 ## Roadmap
 
-Completed: persistent console retail flow, staff product and inventory management with audit history, the customer catalogue website, customer accounts with isolated favourites, a customer basket with simulated web checkout, and the first local WPF inventory-adjustment workflow. Planned next slices expand desktop staff workflows before desktop/server synchronization. Details live in [docs/ROADMAP.md](docs/ROADMAP.md); decisions are logged in [docs/DECISIONS.md](docs/DECISIONS.md).
+Completed: persistent console retail flow, staff product and inventory management with audit history, the customer catalogue website, customer accounts with isolated favourites, a customer basket with simulated web checkout, , the first local WPF inventory-adjustment workflow, and desktop adjustment-history viewing. Planned next slices expand desktop staff workflows before desktop/server synchronization. Details live in [docs/ROADMAP.md](docs/ROADMAP.md); decisions are logged in [docs/DECISIONS.md](docs/DECISIONS.md).
 
 ## Testing
 

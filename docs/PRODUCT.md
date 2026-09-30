@@ -175,6 +175,25 @@ Store staff can run a Windows WPF workspace over the same local SQLite database 
 
 From Windows, run `dotnet run --project src/RetailLab.Desktop`, select an active product, enter `5` and a reason such as `Delivery received`, then apply the adjustment. Confirm the row increases by five. Try `0`, a blank reason, and a negative change larger than current stock to see friendly validation without a stock change. Shorten the window and use the adjustment panel's vertical scrollbar to reach the lower controls and Apply button. Set `RETAILLAB_DATA_DIRECTORY` before launch to use an isolated database.
 
+## Tutorial 6B: desktop adjustment-history viewing
+
+Status: implemented in `RetailLab.Desktop`.
+
+Store staff can select any product, including an archived product, and open a focused modal window showing that product's complete stock-adjustment history.
+
+- A `View adjustment history` button sits in the selected-product area. It is disabled when no product is selected or while the main window is busy, and enabled for both active and archived products.
+- The history window is modal and owned by the main window; closing it returns to the unchanged inventory workspace.
+- The heading shows the selected product clearly (SKU, description, and archived state when applicable).
+- A read-only grid shows Time (UTC), signed Change, Resulting stock, Reason, and Actor, sorted newest first.
+- Products with no adjustments show a friendly empty state instead of an empty grid.
+- Load failures show safe staff-facing text without raw programmer exception details.
+- The existing Apply-adjustment control is unchanged and remains disabled for archived products.
+- Long reasons wrap inside the grid, and the grid scrolls within a sensibly sized window.
+
+### Trying history viewing
+
+From Windows, run `dotnet run --project src/RetailLab.Desktop`, select a product with existing adjustment history, and press `View adjustment history`. Confirm the newest records appear first with correct change, resulting stock, reason, actor, and UTC time. Select a product with no history and confirm the friendly empty state, then open history for an archived product to confirm it remains viewable. Close the window and confirm the workspace is unchanged, then apply a small adjustment to an active product to confirm the existing workflow still works. Set `RETAILLAB_DATA_DIRECTORY` before launch to use an isolated database.
+
 ## Scope boundaries
 
 Desktop product creation/editing, staff authentication and roles, synchronization, search, pagination, deployment, and SaaS tenancy are not implemented yet. Ordering is simulated end to end: the website and console share one ordering implementation with no payment processing. Simultaneous checkouts and staff edits resolve through optimistic-concurrency retries rather than locking.

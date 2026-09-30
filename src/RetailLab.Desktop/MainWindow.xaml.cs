@@ -36,6 +36,21 @@ public partial class MainWindow : Window
         UpdateSelectionPanel();
     }
 
+    private void ViewHistoryButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (InventoryGrid.SelectedItem is not InventoryProductRow selected)
+        {
+            SetStatus("Select a product before viewing adjustment history.", isError: true);
+            return;
+        }
+
+        var historyWindow = new AdjustmentHistoryWindow(selected, createDbContext, timeProvider)
+        {
+            Owner = this
+        };
+        historyWindow.ShowDialog();
+    }
+
     private async void ApplyAdjustmentButton_Click(object sender, RoutedEventArgs e)
     {
         if (InventoryGrid.SelectedItem is not InventoryProductRow selected)
@@ -196,6 +211,7 @@ public partial class MainWindow : Window
             SelectedDescriptionTextBlock.Text = string.Empty;
             SelectedStockTextBlock.Text = string.Empty;
             ApplyAdjustmentButton.IsEnabled = false;
+            ViewHistoryButton.IsEnabled = false;
             return;
         }
 
@@ -206,6 +222,7 @@ public partial class MainWindow : Window
             : $"Current stock: {selected.StockQuantity}";
 
         ApplyAdjustmentButton.IsEnabled = !isBusy && !selected.IsArchived;
+        ViewHistoryButton.IsEnabled = !isBusy;
     }
 
     private void SetBusy(bool busy)

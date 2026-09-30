@@ -74,9 +74,19 @@ Outcome: staff can open a Windows WPF application, review exact stock for active
 - `RetailLabSqliteDatabase` centralizes local SQLite connection and DbContext construction for application composition roots.
 - No WPF framework or other production package was added; XAML and focused code-behind provide the first deliberately small workflow.
 
-### 6B. Expanded staff workflows
+### 6B. Desktop adjustment-history viewing
 
-Proposed outcome: bring product creation, detail editing, archive/unarchive controls, and adjustment history from the console into focused desktop workflows after 6A is reviewed.
+Status: implemented in `RetailLab.Desktop` (Tutorial 6B).
+
+Outcome: staff can select any product, including an archived product, and open a focused modal window showing that product's complete adjustment history newest-first over local SQLite offline.
+
+- The history window coordinates `InventoryService.GetHistoryAsync`; ordering for display, empty states, and safe failure text stay in the presentation layer.
+- Core and Data are unchanged: no schema migration, no business-rule change, no new package.
+- No MVVM framework was added; XAML and focused code-behind remain sufficient for two windows.
+
+### 6C. Expanded staff workflows
+
+Proposed outcome: bring product creation, detail editing, and archive/unarchive controls from the console into focused desktop workflows after 6B is reviewed.
 
 ## 7. Desktop and server synchronization
 
