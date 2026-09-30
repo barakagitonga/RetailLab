@@ -47,6 +47,8 @@ builder.Services.AddScoped<IRetailRepository, EfRetailRepository>();
 builder.Services.AddScoped<CatalogService>();
 builder.Services.AddScoped<BookmarkService>();
 builder.Services.AddScoped<BasketService>();
+builder.Services.AddScoped<OrderService>();
+builder.Services.AddScoped<CheckoutService>();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<CatalogDisplayMapper>();
 

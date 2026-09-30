@@ -11,8 +11,8 @@ All projects target .NET 10 with nullable reference checking and implicit import
 | `src/RetailLab.Core` | Retail entities, validation, business workflows, customer catalogue lookups, and the persistence boundary. It has no EF Core or UI dependency. |
 | `src/RetailLab.Data` | EF Core SQLite context, mappings, repository, migrations, and idempotent sample-data initialization. |
 | `src/RetailLab.LabCli` | Interactive Lab Prototype 1 console interface plus staff product and inventory workflow, and application startup. |
-| `src/RetailLab.Web` | Customer storefront (Razor Pages): home, catalogue, product details, Identity-backed accounts, per-customer favourites, and a per-customer basket over the same Core and Data layers. |
-| `tests/RetailLab.Tests` | Core unit tests, Web display and redirect-policy tests, and SQLite integration tests (including standard Identity account flows and basket persistence conflicts). |
+| `src/RetailLab.Web` | Customer storefront (Razor Pages): home, catalogue, product details, Identity-backed accounts, per-customer favourites, a per-customer basket, and simulated basket checkout with order history over the same Core and Data layers. |
+| `tests/RetailLab.Tests` | Core unit tests, Web display and redirect-policy tests, and SQLite integration tests (including standard Identity account flows, basket persistence conflicts, and checkout plus product-concurrency races). |
 
 No Desktop project exists yet.
 
@@ -40,7 +40,7 @@ Product 1 --------< Bookmark
    +--------------< InventoryAdjustment
 ```
 
-- `Product` owns SKU (immutable), description, price, stock, archive state, and stock-mutation rules.
+- `Product` owns SKU (immutable), description, price, stock, archive state, and stock-mutation rules, plus a `Version` optimistic-concurrency token bumped by every successful mutation.
 - `Bookmark` joins the fixed simulated customer to a product.
 - `BasketItem` joins a customer to a product with a positive quantity, timestamps, and a `Version` optimistic-concurrency token.
 - `Order` owns its lines and calculates its total.
@@ -48,11 +48,13 @@ Product 1 --------< Bookmark
 - `InventoryAdjustment` records one stock change with signed quantity delta, resulting quantity, required reason, actor identifier, and UTC timestamp.
 - `BookmarkService` coordinates add/remove behavior and rejects archived products for new bookmarks.
 - `BasketService` owns basket rules (unknown and archived products, quantities, merge overflow) and reports customer-correctable failures as `BusinessRuleException`; expected persistence conflicts surface as the Core-owned `BasketConflictException`.
-- `OrderService` validates a complete request before changing stock, rejects archived products, creates the order, records one `InventoryAdjustment` per line with reason `Simulated order`, and commits through `IRetailRepository`.
+- `OrderService` validates a complete request before changing stock, rejects archived products, creates the order, records one `InventoryAdjustment` per line with reason `Simulated order`, and commits through `IRetailRepository`. Its internal `StageAsync` (validate-all-then-stage, optional prescribed order id, no save) is shared by console ordering and web checkout.
+- `CheckoutService` converts one customer's basket into an order through the shared staging, removes that customer's basket lines, and commits everything in one save; the checkout-attempt identifier doubles as the order id for idempotent resubmission.
 - `ProductService` coordinates product creation, detail updates, archiving, and unarchiving.
 - `InventoryService` validates staff adjustments (including reason and actor) before mutating stock, appends the audit record, and exposes adjustment history.
 - `CatalogService` owns customer-visible lookups: active-only product lists and single-product lookup returning null for missing or archived SKUs.
 - `IRetailRepository` is the Core-owned persistence boundary implemented by `EfRetailRepository` in Data.
+- Expected persistence races surface as Core-owned conflicts: `BasketConflictException` (basket saves), `CheckoutConflictException` (checkout saves), `ProductConflictException` (staff and console product writes). Presentation layers catch these, never EF exception types.
 
 ## Website layer
 
@@ -70,15 +72,25 @@ The Favourites PageModel is fully `[Authorize]` with `OnGetAsync`, `OnPostAddAsy
 
 The Basket PageModel follows the same shape as Favourites but is fully `[Authorize]` with `OnGetAsync`, `OnPostAddAsync`, `OnPostUpdateAsync`, and `OnPostRemoveAsync` handlers. Catalogue cards post quantity 1, the product page posts the customer's chosen quantity, and the basket page posts quantity edits and removals; anonymous visitors get a "Sign in to add to basket" link instead of forms, for the same never-replay reason. The service owns every rule, so handlers only bind, invoke `BasketService`, map `BusinessRuleException` messages and `BasketConflictException` retries to TempData notices, and redirect. Return URLs pass through the PageModel's private `RedirectToLocal` (`Url.IsLocalUrl`, never the favourites-named helper): Add falls back to the product page or catalogue, Update and Remove to `/Basket`.
 
-Basket lines render through the `BasketLine` display model (unit price, line total, availability band, archived flag) mapped by `CatalogDisplayMapper`, keeping USD formatting out of Core. Archived lines show "No longer available" with removal as the only action. The basket reserves nothing: out-of-stock products stay addable and retained, and a neutral note says stock and prices are confirmed when ordering. There is no checkout button and no header basket count yet.
+Basket lines render through the `BasketLine` display model (unit price, line total, availability band, archived flag) mapped by `CatalogDisplayMapper`, keeping USD formatting out of Core. Archived lines show "No longer available" with removal as the only action. The basket reserves nothing: out-of-stock products stay addable and retained, and a note says stock and prices are confirmed when ordering.
 
-`SaveBasketChangesAsync` is the only basket commit path: it translates EF `DbUpdateException` failures — concurrent first-add key collisions and stale-`Version` losses — into `BasketConflictException`, so simultaneous requests retry with a friendly notice instead of corrupting the basket or surfacing HTTP 500. There are no idempotency keys: Post-Redirect-Get stops refresh resubmission, but two rapid Add clicks can add twice; checkout (Tutorial 5B) enforces stock, so no oversell follows.
+`SaveBasketChangesAsync` is the only basket commit path: it translates EF `DbUpdateException` failures — concurrent first-add key collisions and stale-`Version` losses — into `BasketConflictException`, so simultaneous requests retry with a friendly notice instead of corrupting the basket or surfacing HTTP 500. There are no idempotency keys on basket edits: Post-Redirect-Get stops refresh resubmission, but two rapid Add clicks can add twice; checkout enforces stock, so no oversell follows.
+
+## Web checkout
+
+The basket page mints a fresh server-generated checkout-attempt identifier per render and posts it with the "Place simulated order" form to the fully `[Authorize]` Basket page. `CheckoutService` validates the attempt id, returns the original order when the id already exists for the customer, rejects an empty basket, and otherwise stages through the shared `OrderService.StageAsync` (one implementation for web and console: combined requests, per-line existence/archive/stock checks against current data, current-price snapshots, stock reduction, one `Simulated order` adjustment per line). Basket-line removal joins the same tracked unit of work, and a single `SaveCheckoutChangesAsync` commits order, lines, stock, adjustments, and basket deletion in one relational transaction — or rolls everything back.
+
+Duplicate handling needs no extra table: the attempt identifier *is* the new order's id. A sequential repeat hits the scoped pre-check; a concurrent same-id race collides on the `Orders` primary key, translates to `CheckoutConflictException`, and the service re-reads committed state to return the winner. A forged id belonging to another customer resolves to nothing at either lookup, so it can only produce a generic retry, never another customer's order.
+
+Stale data fails safe: `Product.Version` (bumped by details, archive, and stock changes) and `BasketItem.Version` are concurrency tokens, so a price change, archive, stock move, basket edit, or racing checkout after load fails the save and the customer retries against current state. Two customers cannot both buy the final unit: the loser's product update matches zero rows.
+
+Every POST ends in Post-Redirect-Get: success redirects to `/Orders/{id}`, rule and conflict failures redirect to `/Basket` with TempData notices. `/Orders` and `/Orders/{id}` are fully `[Authorize]`; the details page returns 404 for unknown and foreign ids alike. Orders render through `OrderSummary`/`OrderDetails` display models with USD formatting owned by `CatalogDisplayMapper`, and every order surface states that no payment was processed.
 
 ## Database
 
 `RetailLabDbContext` maps thirteen SQLite tables: six RetailLab business tables plus seven framework-managed Identity tables.
 
-- `Products`, with a case-insensitive unique SKU, nonnegative price and stock constraints, plus `IsArchived` and nullable `ArchivedAtUtc`.
+- `Products`, with a case-insensitive unique SKU, nonnegative price and stock constraints, plus `IsArchived`, nullable `ArchivedAtUtc`, and `Version` as an optimistic-concurrency token.
 - `Bookmarks`, with `(CustomerIdentifier, ProductId)` as its composite primary key. Customer bookmark queries exclude archived products.
 - `BasketItems`, with `(CustomerIdentifier, ProductId)` as its composite primary key, a positive-quantity check constraint, and `Version` as an optimistic-concurrency token. Customer basket queries include products in one query with no archived filter.
 - `Orders`, indexed by customer identifier and placement time.
@@ -87,7 +99,7 @@ Basket lines render through the `BasketLine` display model (unit price, line tot
 
 - `AspNetUsers`, `AspNetRoles`, `AspNetUserClaims`, `AspNetRoleClaims`, `AspNetUserLogins`, `AspNetUserRoles`, and `AspNetUserTokens`: the standard framework-managed Identity schema. Business tables hold no credentials and no foreign keys to these tables.
 
-Migrations are stored in `RetailLab.Data/Migrations`. Application startup applies pending migrations, then inserts the fictional sample catalogue only if no products exist. It never recreates the database. Existing data survives the product-archive and adjustments migration unchanged; historic order-driven stock changes before Tutorial 2 have no adjustment rows.
+Migrations are stored in `RetailLab.Data/Migrations`. Application startup applies pending migrations, then inserts the fictional sample catalogue only if no products exist. It never recreates the database. Existing data survives the product-archive and adjustments migration unchanged; historic order-driven stock changes before Tutorial 2 have no adjustment rows. The product-version migration adds `Version` with a zero default for existing rows.
 
 The runtime database file (`retaillab.db` plus SQLite WAL/shared-memory sidecars) is local demonstration data and is git-ignored; it must never live inside the repository.
 
@@ -138,10 +150,21 @@ Browser POST + antiforgery token
     -> TempData notice + 302 redirect (validated return URL or fallback)
 ```
 
-A successful order tracks stock changes, inventory adjustments, a new order, and all new lines in one DbContext. `SaveChangesAsync` persists them in one relational transaction. A staff adjustment tracks the stock change and its audit record the same way. Invalid or insufficient-stock requests fail before any product is changed; invalid reasons or actors fail before stock is mutated.
+Browser POST (a signed-in checkout):
+
+```text
+Browser POST + antiforgery token + checkout-attempt id
+    -> auth middleware ([Authorize] already passed)
+    -> Basket PageModel -> CheckoutService (idempotent pre-check, shared staging, basket removal)
+    -> IRetailRepository.SaveCheckoutChangesAsync -> EF Core DbContext
+    -> SQLite, one transaction (stale Version or duplicate order id -> CheckoutConflictException)
+    -> TempData notice + 302 redirect (/Orders/{id} on success, /Basket on failure)
+```
+
+A successful order tracks stock changes, inventory adjustments, a new order, and all new lines (and, for web checkout, basket deletions) in one DbContext. `SaveChangesAsync` persists them in one relational transaction. A staff adjustment tracks the stock change and its audit record the same way. Invalid or insufficient-stock requests fail before any product is changed; invalid reasons or actors fail before stock is mutated.
 
 The database defaults to `%LOCALAPPDATA%\RetailLab\LabPrototype1\retaillab.db`. The `RETAILLAB_DATA_DIRECTORY` environment variable can select an isolated location for development, and both the console and the website honor it so they can deliberately share one local database.
 
 ## Deferred architecture
 
-Web checkout (including checkout idempotency), staff administration and roles, WPF, synchronization, search, pagination, deployment, and SaaS tenancy are not implemented yet. Shared models do not imply that future server and offline desktop applications will share one physical database file.
+Staff administration and roles, WPF, synchronization, search, pagination, deployment, and SaaS tenancy are not implemented yet. Shared models do not imply that future server and offline desktop applications will share one physical database file.

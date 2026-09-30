@@ -52,5 +52,9 @@ else
         }
     </ul>
     <p class="basket-total">Basket total: @Model.BasketTotalDisplay</p>
-    <p class="basket-note">Stock and prices are confirmed when you place your order.</p>
+    <form method="post" asp-page="/Basket" asp-page-handler="Checkout">
+        <input type="hidden" name="checkoutAttemptId" value="@Model.CheckoutAttemptId" />
+        <button type="submit">Place simulated order</button>
+    </form>
+    <p class="basket-note">Simulated checkout: no payment is processed. Stock and prices are confirmed when you place your order.</p>
 }

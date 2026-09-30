@@ -19,7 +19,7 @@ public sealed class ProductService(IRetailRepository repository, TimeProvider ti
 
         var product = new Product(sku, description, price, stockQuantity);
         repository.AddProduct(product);
-        await repository.SaveChangesAsync(cancellationToken);
+        await repository.SaveProductChangesAsync(cancellationToken);
 
         return product;
     }
@@ -33,7 +33,7 @@ public sealed class ProductService(IRetailRepository repository, TimeProvider ti
         var product = await FindOrThrowAsync(sku, cancellationToken);
 
         product.UpdateDetails(description, price);
-        await repository.SaveChangesAsync(cancellationToken);
+        await repository.SaveProductChangesAsync(cancellationToken);
 
         return product;
     }
@@ -45,7 +45,7 @@ public sealed class ProductService(IRetailRepository repository, TimeProvider ti
         var product = await FindOrThrowAsync(sku, cancellationToken);
 
         product.Archive(timeProvider.GetUtcNow());
-        await repository.SaveChangesAsync(cancellationToken);
+        await repository.SaveProductChangesAsync(cancellationToken);
 
         return product;
     }
@@ -57,7 +57,7 @@ public sealed class ProductService(IRetailRepository repository, TimeProvider ti
         var product = await FindOrThrowAsync(sku, cancellationToken);
 
         product.Unarchive();
-        await repository.SaveChangesAsync(cancellationToken);
+        await repository.SaveProductChangesAsync(cancellationToken);
 
         return product;
     }

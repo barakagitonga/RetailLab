@@ -14,7 +14,9 @@ RetailLab is a demonstration and teaching codebase. It is not production-ready a
 
 - **Customer accounts and favourites** — visitors register and sign in through framework-managed Identity with cookie sign-in (credentials live in framework-managed Identity tables, never in business tables). Each account keeps isolated favourites: anonymous pages show a "Sign in to save" link, signed-in customers get Add/Remove forms, and every change follows Post-Redirect-Get with friendly notices.
 
-- **Customer basket** — signed-in customers add products from catalogue cards (one per click) or product pages (chosen quantity), then edit quantities and remove lines on the basket page, with line totals, a basket total, and availability bands. The basket reserves no inventory: out-of-stock products stay addable, archived lines stay visible but only removable, and a neutral note explains that stock and prices are confirmed when ordering. Conflicting simultaneous changes show a friendly retry notice instead of an error page.
+- **Customer basket** — signed-in customers add products from catalogue cards (one per click) or product pages (chosen quantity), then edit quantities and remove lines on the basket page, with line totals, a basket total, and availability bands. The basket reserves no inventory: out-of-stock products stay addable, archived lines stay visible but only removable, and a note explains that stock and prices are confirmed when ordering. Conflicting simultaneous changes show a friendly retry notice instead of an error page.
+
+- **Simulated web checkout** — signed-in customers convert the basket into a simulated order with one atomic save (snapshot lines, stock reduction, audit entries, basket clearing), then view confirmation and order history. Duplicate submissions resolve to the original order, concurrent races retry with friendly notices, and every order surface states that no payment is processed.
 
 ## Technology stack
 
@@ -51,10 +53,10 @@ Browser / Console
 
 | Project | Role |
 | --- | --- |
-| `src/RetailLab.Core` | Business entities (`Product`, `Order`, `Bookmark`, `BasketItem`, `InventoryAdjustment`), validation, and services (`OrderService`, `ProductService`, `InventoryService`, `BookmarkService`, `BasketService`, `CatalogService`). Has no dependency on UI frameworks or Entity Framework Core. |
+| `src/RetailLab.Core` | Business entities (`Product`, `Order`, `Bookmark`, `BasketItem`, `InventoryAdjustment`), validation, and services (`OrderService`, `CheckoutService`, `ProductService`, `InventoryService`, `BookmarkService`, `BasketService`, `CatalogService`). Has no dependency on UI frameworks or Entity Framework Core. |
 | `src/RetailLab.Data` | EF Core `DbContext`, entity mappings, the `EfRetailRepository` implementation, the standard Identity EF Core store (`AspNetUsers` and related framework tables), migrations, and idempotent seed data. |
 | `src/RetailLab.LabCli` | Console application hosting the persistent retail workflow and the staff product/inventory workflow. |
-| `src/RetailLab.Web` | Razor Pages storefront: catalogue plus Identity-backed customer accounts, per-customer favourites, and a per-customer basket. PageModels call Core services and render web-only display models; markup never touches entities. |
+| `src/RetailLab.Web` | Razor Pages storefront: catalogue plus Identity-backed customer accounts, per-customer favourites, a per-customer basket, and simulated checkout with order history. PageModels call Core services and render web-only display models; markup never touches entities. |
 | `tests/RetailLab.Tests` | xUnit suite: Core unit tests, Web display tests, and SQLite integration tests. |
 
 ## Getting started
@@ -79,18 +81,18 @@ Both the console and the website use a local SQLite file. By default it lives at
 
 ## Limitations
 
-- Commerce is simulated: no real ordering checkout, no real payment processing.
+- Commerce is simulated: web and console checkout share one ordering implementation with no real payment processing.
 - No staff login yet: the console uses fixed demo labels (`customer-demo-001`, `staff-demo-01`); only web customers have real accounts so far.
 - No synchronization between installations.
 - SQLite is a development and offline-demonstration choice, not a multi-user server database.
 
 ## Roadmap
 
-Completed: persistent console retail flow, staff product and inventory management with audit history, the customer catalogue website, customer accounts with isolated favourites, and a customer basket. Planned next slices: web checkout, a local WPF staff application with offline storage, and desktop/server synchronization. Details live in [docs/ROADMAP.md](docs/ROADMAP.md); decisions are logged in [docs/DECISIONS.md](docs/DECISIONS.md).
+Completed: persistent console retail flow, staff product and inventory management with audit history, the customer catalogue website, customer accounts with isolated favourites, and a customer basket with simulated web checkout. Planned next slices: a local WPF staff application with offline storage, and desktop/server synchronization. Details live in [docs/ROADMAP.md](docs/ROADMAP.md); decisions are logged in [docs/DECISIONS.md](docs/DECISIONS.md).
 
 ## Testing
 
-`dotnet test RetailLab.sln` — observed result: **108 tests, 0 failed** (Core unit tests, Web display and redirect-policy tests, and SQLite integration tests, including migration, archive-visibility, audit-history, two-customer isolation, and standard Identity account coverage: hashing, sign-in, generic credential errors, and lockout; plus basket coverage: service rules, merge overflow, isolation, archived retention and removal, and deterministic persistence-conflict translation).
+`dotnet test RetailLab.sln` — observed result: **136 tests, 0 failed** (Core unit tests, Web display and redirect-policy tests, and SQLite integration tests, including migration, archive-visibility, audit-history, two-customer isolation, and standard Identity account coverage: hashing, sign-in, generic credential errors, and lockout; plus basket coverage: service rules, merge overflow, isolation, archived retention and removal, and deterministic persistence-conflict translation; plus checkout coverage: shared staging, current-price snapshots, isolation, idempotent duplicate submission, atomic rollback, final-unit and stale-data races, product-version conflicts, and order display).
 
 ## Screenshots
 

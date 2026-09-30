@@ -45,17 +45,21 @@ Status: implemented in `RetailLab.Web` with basket storage in `RetailLab.Data` (
 Outcome: a signed-in customer can add catalogue products to a persistent per-account basket (one per catalogue card, chosen quantities on the product page), edit quantities and remove lines on the basket page, and see line totals, a basket total, and the existing availability bands.
 
 - Core-owned rules: `BasketService` validates unknown and archived products, quantities, and merge overflow as `BusinessRuleException`; `BasketItem` carries a `Version` optimistic-concurrency token.
-- No inventory reservation: out-of-stock products stay addable and retained; checkout enforces stock in 5B. No checkout button yet — a neutral note says stock and prices are confirmed when ordering.
+- No inventory reservation: out-of-stock products stay addable and retained; checkout enforces stock in 5B. The basket page carries a "Place simulated order" button with a note that stock and prices are confirmed when ordering.
 - Persistence conflicts (concurrent first-add key collisions, stale `Version` losses) translate inside Data to the Core-owned `BasketConflictException`, shown as a friendly retry notice; Web never sees EF exception types.
 - Safeguards: fully `[Authorize]` basket page, account isolation, archived lines visible but only removable, `Url.IsLocalUrl` return-URL checks with product/catalogue/basket fallbacks, Post-Redirect-Get with TempData notices, antiforgery on every form, an additive migration, and automated Core, SQLite (including deterministic conflict-translation), and display tests.
 
 ### 5B. Web checkout
 
-Proposed outcome: an authenticated customer can submit the basket as an order and view confirmation and history.
+Status: implemented in `RetailLab.Web` with shared ordering in `RetailLab.Core` and storage in `RetailLab.Data` (Tutorial 5B).
 
-- Reuse the Core ordering behavior demonstrated by Lab Prototype 1.
-- Enforce stock and prices at order time, with duplicate-submission and idempotency protection.
-- Continue to exclude real payment processing.
+Outcome: a signed-in customer can submit the basket as a simulated order and view confirmation and history.
+
+- Shared ordering behavior: `OrderService.StageAsync` validates and stages for both console and web; checkout adds basket removal to the same atomic save.
+- Current-data enforcement: existence, archive state, stock, and current-price snapshots at order time.
+- Idempotent submission: the server-generated checkout-attempt identifier doubles as the order id; repeats return the original order.
+- Product optimistic concurrency: two customers cannot buy the final unit; stale checkouts roll back with friendly retries.
+- Safeguards: fully `[Authorize]` order pages, customer-scoped lookups (forged ids 404), Post-Redirect-Get with TempData notices, antiforgery on every form, an additive version migration preserving existing data, explicit simulated-order copy with no payment handling, and automated Core, SQLite race, and display tests.
 
 ## 6. Local staff inventory application
 

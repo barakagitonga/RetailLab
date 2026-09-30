@@ -20,6 +20,12 @@ public sealed class CatalogDisplayMapper
 
     public static string FormatPrice(decimal price) => price.ToString("C", UsCulture);
 
+    public static string FormatPlacedAt(DateTimeOffset placedAt) =>
+        placedAt.UtcDateTime.ToString("MMMM d, yyyy h:mm tt 'UTC'", UsCulture);
+
+    public static string ItemsDisplayFor(int lineCount) =>
+        lineCount == 1 ? "1 item" : $"{lineCount} items";
+
     public static string AvailabilityFor(int stockQuantity) =>
         stockQuantity <= 0 ? "Out of stock"
         : stockQuantity <= LowStockThreshold ? "Low stock"
@@ -74,6 +80,42 @@ public sealed class CatalogDisplayMapper
             Quantity = item.Quantity,
             LineTotalDisplay = FormatPrice(product.Price * item.Quantity),
             IsArchived = product.IsArchived
+        };
+    }
+
+    public OrderSummary ToOrderSummary(Order order)
+    {
+        ArgumentNullException.ThrowIfNull(order);
+
+        return new OrderSummary
+        {
+            Id = order.Id,
+            PlacedAtDisplay = FormatPlacedAt(order.PlacedAtUtc),
+            ItemsDisplay = ItemsDisplayFor(order.Lines.Count),
+            TotalDisplay = FormatPrice(order.Total)
+        };
+    }
+
+    public OrderDetails ToOrderDetails(Order order)
+    {
+        ArgumentNullException.ThrowIfNull(order);
+
+        return new OrderDetails
+        {
+            Id = order.Id,
+            PlacedAtDisplay = FormatPlacedAt(order.PlacedAtUtc),
+            TotalDisplay = FormatPrice(order.Total),
+            Lines = order.Lines
+                .OrderBy(line => line.Sku)
+                .Select(line => new OrderLineItem
+                {
+                    Sku = line.Sku,
+                    Description = line.ProductDescription,
+                    Quantity = line.Quantity,
+                    UnitPriceDisplay = FormatPrice(line.UnitPrice),
+                    LineTotalDisplay = FormatPrice(line.LineTotal)
+                })
+                .ToList()
         };
     }
 }

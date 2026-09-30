@@ -1,0 +1,31 @@
+@page "/Orders/{id:guid}"
+@model RetailLab.Web.Pages.Orders.DetailsModel
+@{
+    ViewData["Title"] = "Order confirmation";
+}
+
+@if (Model.Order is null)
+{
+    <h1>Order not found</h1>
+    <p>That order does not exist or is no longer available.</p>
+    <p><a asp-page="/Orders/Index">Back to your orders</a></p>
+}
+else
+{
+    <nav aria-label="Breadcrumb"><a asp-page="/Orders/Index">Orders</a> / Confirmation</nav>
+    <h1>Simulated order confirmation</h1>
+    <p class="notice notice-success" role="status">Simulated order — no payment was processed.</p>
+    <p>Placed @Model.Order.PlacedAtDisplay</p>
+    <ul class="cards">
+        @foreach (var line in Model.Order.Lines)
+        {
+            <li class="card">
+                <h2>@line.Description</h2>
+                <p class="sku">Product code: @line.Sku</p>
+                <p class="price">@line.UnitPriceDisplay <span class="line-total">(@line.LineTotalDisplay for @line.Quantity)</span></p>
+            </li>
+        }
+    </ul>
+    <p class="basket-total">Order total: @Model.Order.TotalDisplay</p>
+    <p><a asp-page="/Orders/Index">Back to your orders</a></p>
+}

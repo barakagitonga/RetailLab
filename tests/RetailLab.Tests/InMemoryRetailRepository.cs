@@ -105,6 +105,16 @@ internal sealed class InMemoryRetailRepository(params Product[] products) : IRet
 
     public void RemoveBasketItem(BasketItem item) => BasketItems.Remove(item);
 
+    public Task<IReadOnlyList<BasketItem>> GetBasketItemsForCheckoutAsync(
+        string customerIdentifier,
+        CancellationToken cancellationToken = default)
+    {
+        // Same live references as the display query. The in-memory double
+        // enforces no optimistic concurrency, so checkout races are covered
+        // by the SQLite integration tests instead.
+        return GetBasketItemsAsync(customerIdentifier, cancellationToken);
+    }
+
     public Task SaveBasketChangesAsync(CancellationToken cancellationToken = default)
     {
         SaveCount++;
@@ -121,7 +131,30 @@ internal sealed class InMemoryRetailRepository(params Product[] products) : IRet
             Orders.Where(order => order.CustomerIdentifier == customerIdentifier).ToList());
     }
 
+    public Task<Order?> FindOrderAsync(
+        string customerIdentifier,
+        Guid orderId,
+        CancellationToken cancellationToken = default)
+    {
+        return Task.FromResult(
+            Orders.SingleOrDefault(
+                order => order.CustomerIdentifier == customerIdentifier &&
+                         order.Id == orderId));
+    }
+
     public Task SaveChangesAsync(CancellationToken cancellationToken = default)
+    {
+        SaveCount++;
+        return Task.CompletedTask;
+    }
+
+    public Task SaveProductChangesAsync(CancellationToken cancellationToken = default)
+    {
+        SaveCount++;
+        return Task.CompletedTask;
+    }
+
+    public Task SaveCheckoutChangesAsync(CancellationToken cancellationToken = default)
     {
         SaveCount++;
         return Task.CompletedTask;

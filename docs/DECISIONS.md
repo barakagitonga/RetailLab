@@ -103,11 +103,37 @@ Reason: simultaneous requests must never corrupt the basket or surface HTTP 500.
 
 Consequences:
 
-- The basket reserves no inventory: out-of-stock products can be added and retained with the existing availability bands, and checkout (Tutorial 5B) enforces stock and prices. No checkout button exists yet; the basket page carries a neutral note that stock and prices are confirmed when ordering.
+- The basket reserves no inventory: out-of-stock products can be added and retained with the existing availability bands, and checkout (Tutorial 5B) enforces stock and prices.
 - Catalogue cards add one item; quantity selection lives on the product page and quantity editing on the basket page. Updating to zero is rejected with a message pointing at the separate Remove action.
 - Archived lines stay visible with a "No longer available" note; only removal works for them, through the all-products lookup rather than the active-only catalogue.
-- Tutorial 5A has no idempotency keys: Post-Redirect-Get prevents refresh resubmission, but two rapid Add clicks can add twice. This is honest basket behavior for this slice — stock enforcement at checkout means no oversell.
+- Tutorial 5A basket edits have no idempotency keys: Post-Redirect-Get prevents refresh resubmission, but two rapid Add clicks can add twice. This is honest basket behavior for this slice — stock enforcement at checkout means no oversell.
 - No new packages were introduced. The `BasketItems` table arrives through an additive migration; existing business data is untouched.
+
+## D012 - Web checkout through shared staging with Order.Id idempotency
+
+Status: approved and implemented (Tutorial 5B).
+
+`OrderService` keeps its public `PlaceAsync` behavior and signature, but its validate-all-then-stage work moves into an internal `StageAsync` (optional prescribed order id, no save) shared by console ordering and the new `CheckoutService`. Web checkout stages through it, removes the customer's tracked basket lines, and commits order, lines, stock, adjustments, and basket deletion in a single `SaveCheckoutChangesAsync`, so a completed order can never strand an uncleared basket.
+
+The basket page mints a server-generated checkout-attempt identifier per render that doubles as the new order's id: no idempotency table, no extra column, no cleanup. A sequential repeat returns the pre-checked order; a concurrent same-id race collides on the `Orders` key and the service re-reads committed state to return the winner (proven by a two-context SQLite test on the loser's own context). Every order lookup is scoped by customer id, so forged ids render 404 and leak nothing. Success follows Post-Redirect-Get to `/Orders/{id}`; `/Orders` and `/Orders/{id}` are fully `[Authorize]`; every order surface states that no payment was processed.
+
+Consequences:
+
+- Console ordering behavior and tests are unchanged; both ordering paths enforce identical rules from one implementation.
+- `CheckoutConflictException` (Core-owned) covers stale versions and duplicate inserts; Web catches it and shows a friendly retry notice, never EF exception types.
+- Order history and confirmation render through web display models with USD formatting at the edge, keeping Core locale-free.
+
+## D013 - Product optimistic concurrency with a versioned migration
+
+Status: approved and implemented (Tutorial 5B).
+
+`Product` carries an integer `Version` token, initialized to zero and bumped after every successful `UpdateDetails`, `Archive`, `Unarchive`, and stock mutation, configured as an EF Core concurrency token. Two customers cannot both buy the final unit, and a concurrent price, archive, or stock change invalidates a stale checkout, which rolls back entirely. An additive `ProductVersion` migration backfills existing rows with zero; no data is rewritten or lost.
+
+Consequences:
+
+- `SaveProductChangesAsync` translates stale product versions into the Core-owned `ProductConflictException` for `ProductService`, `InventoryService`, and console `OrderService.PlaceAsync`; the console prints its friendly message. Staff and console conflicts are never labeled as checkout conflicts.
+- `BookmarkService` keeps the raw save: bookmarks carry no concurrency token, and its pre-existing duplicate-add behavior is unchanged.
+- Version races are covered by SQLite integration tests (staff update-vs-update, adjust-vs-adjust, console order-vs-order, final-unit checkout race, price/archive-after-load rollback); the in-memory test double enforces no concurrency by design.
 
 ## Open decisions
 
@@ -116,5 +142,4 @@ Consequences:
 | Permanent retailer brand and multi-currency support (Tutorial 3 uses temporary name RetailLab and USD-at-edge) | Storefront hardening |
 | Stock adjustment reason taxonomy (free text vs enum) and actor roles | Protected web workflows |
 | Staff permissions and roles (customer password sign-in is done) | Protected web workflows |
-| Checkout idempotency and duplicate-submission handling (basket conflicts already translate per D011) | Multi-user ordering |
 | Server storage, data ownership, synchronization transport, and conflict policy | Synchronization implementation |
