@@ -53,6 +53,137 @@ public partial class MainWindow : Window
         }
     }
 
+    private async void EditProductButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (InventoryGrid.SelectedItem is not InventoryProductRow selected)
+        {
+            SetStatus("Select a product before editing details.", isError: true);
+            return;
+        }
+
+        if (selected.IsArchived)
+        {
+            SetStatus($"Product {selected.Sku} is archived. Unarchive it before editing details.", isError: true);
+            return;
+        }
+
+        var editWindow = new EditProductWindow(selected, createDbContext, timeProvider)
+        {
+            Owner = this
+        };
+
+        if (editWindow.ShowDialog() == true && editWindow.SavedSku is string savedSku)
+        {
+            await RefreshProductsAsync(savedSku, $"Updated {savedSku}.");
+        }
+        else if (editWindow.HadConflict)
+        {
+            await RefreshProductsAsync(
+                selected.Sku,
+                $"{selected.Sku} changed elsewhere. The list has been refreshed; review the current values before editing again.");
+        }
+    }
+
+    private async void ArchiveToggleButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (InventoryGrid.SelectedItem is not InventoryProductRow selected)
+        {
+            SetStatus("Select a product before changing its archive state.", isError: true);
+            return;
+        }
+
+        if (selected.IsArchived)
+        {
+            await UnarchiveSelectedAsync(selected);
+            return;
+        }
+
+        var answer = MessageBox.Show(
+            this,
+            $"Archive {selected.Sku} ({selected.Description})?\n\n" +
+            "- It will disappear from the customer catalogue and favourites.\n" +
+            "- Existing basket lines stay visible but become unavailable: customers can only remove them.\n" +
+            "- Stock, orders, and adjustment history are kept.\n" +
+            "- You can unarchive it later; nothing is deleted.",
+            $"Archive {selected.Sku}?",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Question,
+            MessageBoxResult.No);
+
+        if (answer != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
+        await ArchiveSelectedAsync(selected);
+    }
+
+    private async Task ArchiveSelectedAsync(InventoryProductRow selected)
+    {
+        SetBusy(true);
+
+        try
+        {
+            await using var dbContext = createDbContext();
+            var service = new ProductService(new EfRetailRepository(dbContext), timeProvider);
+            await service.ArchiveAsync(selected.Sku, selected.Version);
+            await RefreshProductsAsync(
+                selected.Sku,
+                $"Archived {selected.Sku}. It is hidden from customers but can be unarchived later.");
+        }
+        catch (ProductConflictException)
+        {
+            await RefreshProductsAsync(
+                selected.Sku,
+                $"{selected.Sku} changed elsewhere. The list has been refreshed; review the current product and try again.");
+        }
+        catch (BusinessRuleException exception)
+        {
+            SetStatus(exception.Message, isError: true);
+        }
+        catch (Exception)
+        {
+            SetStatus("The product could not be archived. Check the local database and try again.", isError: true);
+        }
+        finally
+        {
+            SetBusy(false);
+        }
+    }
+
+    private async Task UnarchiveSelectedAsync(InventoryProductRow selected)
+    {
+        SetBusy(true);
+
+        try
+        {
+            await using var dbContext = createDbContext();
+            var service = new ProductService(new EfRetailRepository(dbContext), timeProvider);
+            await service.UnarchiveAsync(selected.Sku, selected.Version);
+            await RefreshProductsAsync(
+                selected.Sku,
+                $"Unarchived {selected.Sku}. It is visible to customers again.");
+        }
+        catch (ProductConflictException)
+        {
+            await RefreshProductsAsync(
+                selected.Sku,
+                $"{selected.Sku} changed elsewhere. The list has been refreshed; review the current product and try again.");
+        }
+        catch (BusinessRuleException exception)
+        {
+            SetStatus(exception.Message, isError: true);
+        }
+        catch (Exception)
+        {
+            SetStatus("The product could not be unarchived. Check the local database and try again.", isError: true);
+        }
+        finally
+        {
+            SetBusy(false);
+        }
+    }
+
     private async void RefreshInventoryButton_Click(object sender, RoutedEventArgs e)
     {
         var selectedSku = (InventoryGrid.SelectedItem as InventoryProductRow)?.Sku;
@@ -235,6 +366,9 @@ public partial class MainWindow : Window
             SelectedStockTextBlock.Text = string.Empty;
             ApplyAdjustmentButton.IsEnabled = false;
             ViewHistoryButton.IsEnabled = false;
+            EditProductButton.IsEnabled = false;
+            ArchiveToggleButton.IsEnabled = false;
+            ArchiveToggleButton.Content = "Archive selected";
             return;
         }
 
@@ -246,6 +380,9 @@ public partial class MainWindow : Window
 
         ApplyAdjustmentButton.IsEnabled = !isBusy && !selected.IsArchived;
         ViewHistoryButton.IsEnabled = !isBusy;
+        EditProductButton.IsEnabled = !isBusy && !selected.IsArchived;
+        ArchiveToggleButton.IsEnabled = !isBusy;
+        ArchiveToggleButton.Content = selected.IsArchived ? "Unarchive selected" : "Archive selected";
     }
 
     private void SetBusy(bool busy)
@@ -254,6 +391,8 @@ public partial class MainWindow : Window
         InventoryGrid.IsEnabled = !busy;
         NewProductButton.IsEnabled = !busy;
         RefreshInventoryButton.IsEnabled = !busy;
+        EditProductButton.IsEnabled = !busy;
+        ArchiveToggleButton.IsEnabled = !busy;
         QuantityChangeTextBox.IsEnabled = !busy;
         ReasonTextBox.IsEnabled = !busy;
         UpdateSelectionPanel();

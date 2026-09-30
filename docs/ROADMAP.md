@@ -96,9 +96,16 @@ Outcome: staff can create products through a focused modal dialog and explicitly
 
 ### 6D. Desktop product editing and archive controls
 
-Proposed outcome: bring detail editing and archive/unarchive controls from the console into focused desktop workflows after 6C is reviewed.
+Status: implemented in `RetailLab.Desktop` (Tutorial 6D).
 
-Design concerns to resolve first: stale-form concurrency (another interface changing the product while the edit form is open) and destructive-action confirmation UX for archiving.
+Outcome: staff can edit active-product details through a focused modal dialog, archive products with explicit confirmation, or unarchive them without that destructive-action warning, while expected-version checks prevent stale forms and stale grid actions from overwriting newer data.
+
+- The edit dialog validates for immediate friendly feedback and saves only through the expected-version `ProductService.UpdateDetailsAsync`; archiving requires an explicit Yes/No confirmation explaining catalogue, favourites, basket, history, and reversibility effects, while unarchiving does not require that destructive-action warning.
+- `InventoryProductRow` carries the internal `Version` captured at load; the service compares it before mutating and throws `ProductConflictException` on mismatch without mutating or saving.
+- Conflicts refresh the grid automatically with friendly review-and-retry guidance; no state-changing action ever retries itself.
+- No schema migration, no new package, and no MVVM framework were needed.
+
+Desktop/server synchronization stays separate: 6D only coordinates multiple local interfaces over one shared database file through explicit refresh and optimistic concurrency.
 
 ## 7. Desktop and server synchronization
 

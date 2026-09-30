@@ -18,7 +18,7 @@ RetailLab is a demonstration and teaching codebase. It is not production-ready a
 
 - **Simulated web checkout** — signed-in customers convert the basket into a simulated order with one atomic save (snapshot lines, stock reduction, audit entries, basket clearing), then view confirmation and order history. Duplicate submissions resolve to the original order, concurrent races retry with friendly notices, and every order surface states that no payment is processed.
 
-- **Offline desktop inventory** — a WPF staff workspace lists exact local stock, including archived products, records signed stock adjustments with a required reason through the same audited Core workflow used by the console, opens a focused read-only window showing the selected product's complete adjustment history (newest first), creates new products through a focused dialog, and refreshes the list explicitly after external changes.
+- **Offline desktop inventory** — a WPF staff workspace lists exact local stock, including archived products, records signed stock adjustments with a required reason through the same audited Core workflow used by the console, opens a focused read-only window showing the selected product's complete adjustment history (newest first), creates new products through a focused dialog, edits product details with stale-form protection, archives products with explicit confirmation, unarchives them when needed, and refreshes the list explicitly after external changes.
 
 ## Technology stack
 
@@ -60,7 +60,7 @@ Browser / Console / WPF
 | `src/RetailLab.Data` | EF Core `DbContext`, entity mappings, the `EfRetailRepository` implementation, the standard Identity EF Core store (`AspNetUsers` and related framework tables), migrations, and idempotent seed data. |
 | `src/RetailLab.LabCli` | Console application hosting the persistent retail workflow and the staff product/inventory workflow. |
 | `src/RetailLab.Web` | Razor Pages storefront: catalogue plus Identity-backed customer accounts, per-customer favourites, a per-customer basket, and simulated checkout with order history. PageModels call Core services and render web-only display models; markup never touches entities. |
-| `src/RetailLab.Desktop` | Windows WPF staff application: exact local inventory, audited stock adjustments, read-only adjustment-history viewing, product creation, and explicit inventory refresh. It coordinates existing Core services and keeps WPF display concerns outside the domain model. |
+| `src/RetailLab.Desktop` | Windows WPF staff application: exact local inventory, audited stock adjustments, read-only adjustment-history viewing, product creation, explicit inventory refresh, detail editing, and archive controls. It coordinates existing Core services and keeps WPF display concerns outside the domain model. |
 | `tests/RetailLab.Tests` | xUnit suite: Core unit tests, Web display tests, and SQLite integration tests. |
 
 ## Getting started
@@ -90,17 +90,17 @@ The console, website, and desktop application use a local SQLite file. By defaul
 
 - Commerce is simulated: web and console checkout share one ordering implementation with no real payment processing.
 - No staff login yet: the console and desktop use fixed demo actor labels; only web customers have real accounts so far.
-- The desktop application adjusts stock, views adjustment history, and creates products; editing and archive controls remain in the console for now.
+- Desktop product management assumes one shared local database file; simultaneous changes from another interface resolve through friendly retry messages rather than locking.
 - No synchronization between installations.
 - SQLite is a development and offline-demonstration choice, not a multi-user server database.
 
 ## Roadmap
 
-Completed: persistent console retail flow, staff product and inventory management with audit history, the customer catalogue website, customer accounts with isolated favourites, a customer basket with simulated web checkout, the first local WPF inventory-adjustment workflow, desktop adjustment-history viewing, and desktop product creation with inventory refresh. Planned next slices expand desktop staff workflows before desktop/server synchronization. Details live in [docs/ROADMAP.md](docs/ROADMAP.md); decisions are logged in [docs/DECISIONS.md](docs/DECISIONS.md).
+Completed: persistent console retail flow, staff product and inventory management with audit history, the customer catalogue website, customer accounts with isolated favourites, a customer basket with simulated web checkout, the first local WPF inventory-adjustment workflow, desktop adjustment-history viewing, desktop product creation with inventory refresh, and desktop product editing with archive controls. Planned next slices address desktop/server synchronization. Details live in [docs/ROADMAP.md](docs/ROADMAP.md); decisions are logged in [docs/DECISIONS.md](docs/DECISIONS.md).
 
 ## Testing
 
-`dotnet test RetailLab.sln` — observed result: **137 tests, 0 failed** (Core unit tests, Web display and redirect-policy tests, and SQLite integration tests, including the shared local SQLite factory, migration, archive-visibility, audit-history, two-customer isolation, and standard Identity account coverage: hashing, sign-in, generic credential errors, and lockout; plus basket coverage: service rules, merge overflow, isolation, archived retention and removal, and deterministic persistence-conflict translation; plus checkout coverage: shared staging, current-price snapshots, isolation, idempotent duplicate submission, atomic rollback, final-unit and stale-data races, product-version conflicts, and order display).
+`dotnet test RetailLab.sln` — observed result: **141 tests, 0 failed** (Core unit tests, Web display and redirect-policy tests, and SQLite integration tests, including the shared local SQLite factory, migration, archive-visibility, audit-history, two-customer isolation, and standard Identity account coverage: hashing, sign-in, generic credential errors, and lockout; plus basket coverage: service rules, merge overflow, isolation, archived retention and removal, and deterministic persistence-conflict translation; plus checkout coverage: shared staging, current-price snapshots, isolation, idempotent duplicate submission, atomic rollback, final-unit and stale-data races, product-version conflicts, order display, and expected-version stale-form conflicts).
 
 ## Screenshots
 
