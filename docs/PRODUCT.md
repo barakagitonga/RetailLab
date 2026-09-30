@@ -213,6 +213,27 @@ Store staff can create products without leaving the inventory workspace, and exp
 
 From Windows, run `dotnet run --project src/RetailLab.Desktop` and press `New product`: create a valid product and confirm it appears selected, then refresh the web catalogue in a browser to see it listed. Try the same SKU in different casing for the friendly duplicate message, plus blank and overlong SKU/description, nonnumeric and negative price, and nonnumeric and negative stock; confirm zero stock is accepted and that Cancel changes nothing. In the console, archive or unarchive a product, then press `Refresh inventory` in Desktop and confirm the state and button availability update. Finish by applying an adjustment and opening history to confirm those workflows still work. Set `RETAILLAB_DATA_DIRECTORY` before launch to share one database between interfaces or to use an isolated folder.
 
+## Tutorial 6D: desktop product editing and archive controls
+
+Status: implemented in `RetailLab.Desktop`.
+
+Store staff can edit active-product details and archive or unarchive products without leaving the inventory workspace, while expected-version checks stop stale forms and stale grid actions from overwriting newer data.
+
+- A responsive action area above the inventory grid offers `New product`, `Edit selected`, `Archive selected`/`Unarchive selected`, and `Refresh inventory`; the archive label follows the selected product, and Edit stays disabled for archived products.
+- `Edit selected` opens a focused modal dialog showing the read-only SKU with editable description and price. SKU cannot be changed and stock stays adjustable only through the audited adjustment workflow.
+- Description is required within the Core-owned maximum length; price must be a nonnegative decimal parsed in the current culture.
+- Saving passes the version captured when the form opened. On success the dialog closes, the grid refreshes, and the SKU is reselected.
+- If another interface saved first, the stale save is rejected without overwriting anything: the grid refreshes to current values with a friendly changed-elsewhere message, and staff review before editing again.
+- Archiving an active product asks an explicit Yes/No confirmation (default No) explaining that the product leaves the catalogue and favourites, basket lines become removal-only, stock/orders/history are retained, unarchiving later is possible, and nothing is deleted. Answering No changes nothing.
+- Unarchiving needs no warning; on success editing and adjustment return and the product can reappear in the catalogue.
+- Stale archive/unarchive actions behave like stale edits: automatic refresh plus a friendly message, never an automatic retry or a second mutation.
+- Failures show safe staff-facing text without raw database or programmer details, and controls return to the correct enabled state after every outcome.
+- Archive is reversible and retains orders, baskets, stock, and history; products are never deleted.
+
+### Trying editing and archive controls
+
+From Windows, run `dotnet run --project src/RetailLab.Desktop`: edit an active product and confirm Desktop and the refreshed web catalogue show the change; verify SKU is read-only with no stock field; try blank and overlong descriptions plus nonnumeric and negative prices; confirm Edit is disabled for archived products. Start an archive, answer No, and confirm nothing changes; archive with Yes and confirm the row flips, Edit/Apply disable, History stays available, and the product leaves the catalogue while a pre-existing basket line turns removal-only. Unarchive and confirm editing returns with catalogue visibility. For the stale-form test, open Edit in Desktop, change the same product through the console in another terminal, then save the old form and confirm the conflict message, the preserved console change, and the refreshed values. For the stale-action test, archive through the console while Desktop shows the product active, then use the stale Desktop archive action and confirm the conflict with automatic refresh and no second mutation. Finish by confirming New Product, Refresh, Adjustment, and History still work. Set `RETAILLAB_DATA_DIRECTORY` before launch to share one database between interfaces or to use an isolated folder.
+
 ## Scope boundaries
 
-Desktop product editing and archive controls, staff authentication and roles, synchronization, search, pagination, deployment, and SaaS tenancy are not implemented yet. Ordering is simulated end to end: the website and console share one ordering implementation with no payment processing. Simultaneous checkouts and staff edits resolve through optimistic-concurrency retries rather than locking.
+Staff authentication and roles, synchronization, search, pagination, deployment, and SaaS tenancy are not implemented yet. Ordering is simulated end to end: the website and console share one ordering implementation with no payment processing. Simultaneous operations use optimistic concurrency rather than locking: checkout workflows may perform bounded retries, while staff-edit conflicts refresh current data and require deliberate review before the user retries.

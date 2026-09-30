@@ -181,6 +181,21 @@ Consequences:
 - UI prechecks are friendly feedback only; Core remains the final authority, and service-thrown validation maps back to fields without raw messages.
 - XAML compilation is covered by the solution build; creation, duplicate, validation, and refresh flows require a Windows manual check.
 
+## D017 - Expected-version stale-form protection plus explicit archive confirmation
+
+Status: approved and implemented (Tutorial 6D).
+
+Teach `ProductService` optional expected-version checks: `UpdateDetailsAsync`, `ArchiveAsync`, and `UnarchiveAsync` gain overloads taking the version the caller saw, while the existing versionless signatures keep working for the console. Desktop carries the internal `Version` on `InventoryProductRow` (never displayed) and passes it from the selected row or open form. The service loads the current product, compares versions before mutating, throws `ProductConflictException` on mismatch without mutating or saving, and still relies on the EF concurrency token for races between the check and the save. Archiving asks an explicit Yes/No confirmation (default No) in plain language; unarchiving needs none.
+
+Reason: EF's save-time token alone cannot protect a stale form. Desktop creates a fresh DbContext per operation, so the operation always loads the current version and the token always passes — the staleness lives outside the DbContext, in the displayed row or the values typed against it. Comparing the UI-captured version before mutating closes that gap with one shared workflow per operation (thin overloads over a private core), no schema change, and no caller-visible storage details. The confirmation exists because archiving changes what customers see; its text states the catalogue, favourites, basket, history, and reversibility effects explicitly so staff never mistake archive for delete.
+
+Consequences:
+
+- Versionless LabCli calls and all existing race tests behave exactly as before; four new Core tests prove match-success plus stale update/archive/unarchive rejection without mutation or save.
+- Conflicts never overwrite the winner and never retry automatically: the grid refreshes and staff review current values before acting again.
+- Archive stays reversible: stock, orders, baskets, and history are retained, and unarchiving restores customer visibility under existing web rules.
+- XAML compilation is covered by the solution build; edit, confirmation, stale-form, and stale-action flows require a Windows manual check.
+
 ## Open decisions
 
 | Question | Resolve before |

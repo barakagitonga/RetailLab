@@ -96,4 +96,68 @@ public sealed class ProductServiceTests
 
         Assert.Equal(0, repository.SaveCount);
     }
+
+    [Fact]
+    public async Task UpdateDetailsAsync_WithMatchingVersion_Succeeds()
+    {
+        var repository = new InMemoryRetailRepository(new Product("SKU-1", "Product", 5m, 2));
+        var service = new ProductService(repository, new TestTimeProvider(Now));
+
+        var product = await service.UpdateDetailsAsync("SKU-1", "Revised", 6m, expectedVersion: 0);
+
+        Assert.Equal("Revised", product.Description);
+        Assert.Equal(6m, product.Price);
+        Assert.Equal(1, product.Version);
+        Assert.Equal(1, repository.SaveCount);
+    }
+
+    [Fact]
+    public async Task UpdateDetailsAsync_WithStaleVersion_ThrowsWithoutMutatingOrSaving()
+    {
+        var product = new Product("SKU-1", "Product", 5m, 2);
+        product.UpdateDetails("Current", 6m);
+        var repository = new InMemoryRetailRepository(product);
+        var service = new ProductService(repository, new TestTimeProvider(Now));
+
+        await Assert.ThrowsAsync<ProductConflictException>(
+            () => service.UpdateDetailsAsync("SKU-1", "Stale edit", 1m, expectedVersion: 0));
+
+        Assert.Equal("Current", product.Description);
+        Assert.Equal(6m, product.Price);
+        Assert.Equal(1, product.Version);
+        Assert.Equal(0, repository.SaveCount);
+    }
+
+    [Fact]
+    public async Task ArchiveAsync_WithStaleVersion_ThrowsWithoutMutatingOrSaving()
+    {
+        var product = new Product("SKU-1", "Product", 5m, 2);
+        product.Archive(Now);
+        var repository = new InMemoryRetailRepository(product);
+        var service = new ProductService(repository, new TestTimeProvider(Now));
+
+        await Assert.ThrowsAsync<ProductConflictException>(
+            () => service.ArchiveAsync("SKU-1", expectedVersion: 0));
+
+        Assert.True(product.IsArchived);
+        Assert.Equal(1, product.Version);
+        Assert.Equal(0, repository.SaveCount);
+    }
+
+    [Fact]
+    public async Task UnarchiveAsync_WithStaleVersion_ThrowsWithoutMutatingOrSaving()
+    {
+        var product = new Product("SKU-1", "Product", 5m, 2);
+        product.Archive(Now);
+        product.Unarchive();
+        var repository = new InMemoryRetailRepository(product);
+        var service = new ProductService(repository, new TestTimeProvider(Now));
+
+        await Assert.ThrowsAsync<ProductConflictException>(
+            () => service.UnarchiveAsync("SKU-1", expectedVersion: 1));
+
+        Assert.False(product.IsArchived);
+        Assert.Equal(2, product.Version);
+        Assert.Equal(0, repository.SaveCount);
+    }
 }

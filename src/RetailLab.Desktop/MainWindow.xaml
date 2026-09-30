@@ -68,19 +68,34 @@
                     <RowDefinition Height="*" />
                 </Grid.RowDefinitions>
 
-                <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                <WrapPanel Margin="0,0,0,4">
                     <Button x:Name="NewProductButton"
+                            Margin="0,0,0,8"
                             MinWidth="140"
                             automation:AutomationProperties.Name="New product"
                             Content="New product"
                             Click="NewProductButton_Click" />
+                    <Button x:Name="EditProductButton"
+                            Margin="12,0,0,8"
+                            MinWidth="140"
+                            automation:AutomationProperties.Name="Edit selected product"
+                            Content="Edit selected"
+                            IsEnabled="False"
+                            Click="EditProductButton_Click" />
+                    <Button x:Name="ArchiveToggleButton"
+                            Margin="12,0,0,8"
+                            MinWidth="170"
+                            automation:AutomationProperties.Name="Archive or unarchive selected product"
+                            Content="Archive selected"
+                            IsEnabled="False"
+                            Click="ArchiveToggleButton_Click" />
                     <Button x:Name="RefreshInventoryButton"
-                            Margin="12,0,0,0"
+                            Margin="12,0,0,8"
                             MinWidth="170"
                             automation:AutomationProperties.Name="Refresh inventory"
                             Content="Refresh inventory"
                             Click="RefreshInventoryButton_Click" />
-                </StackPanel>
+                </WrapPanel>
 
                 <Border Grid.Row="1"
                         Padding="1"
