@@ -31,6 +31,7 @@ public sealed class Product
         StockQuantity = stockQuantity;
         IsArchived = false;
         ArchivedAtUtc = null;
+        Version = 0;
     }
 
     public Guid Id { get; private set; }
@@ -42,6 +43,13 @@ public sealed class Product
     public decimal Price { get; private set; }
 
     public int StockQuantity { get; private set; }
+
+    /// <summary>
+    /// Optimistic-concurrency token. Every successful mutation bumps it, so a
+    /// stale writer (checkout, staff edit, stock adjustment) loses its update
+    /// instead of silently overwriting another request.
+    /// </summary>
+    public int Version { get; private set; }
 
     public bool IsArchived { get; private set; }
 
@@ -62,6 +70,7 @@ public sealed class Product
 
         Description = NormalizeRequired(description, MaximumDescriptionLength, nameof(description));
         Price = price;
+        Version = checked(Version + 1);
     }
 
     public void Archive(DateTimeOffset archivedAtUtc)
@@ -73,6 +82,7 @@ public sealed class Product
 
         IsArchived = true;
         ArchivedAtUtc = archivedAtUtc.ToUniversalTime();
+        Version = checked(Version + 1);
     }
 
     public void Unarchive()
@@ -84,6 +94,7 @@ public sealed class Product
 
         IsArchived = false;
         ArchivedAtUtc = null;
+        Version = checked(Version + 1);
     }
 
     public void AdjustStock(int delta)
@@ -100,6 +111,7 @@ public sealed class Product
         }
 
         StockQuantity += delta;
+        Version = checked(Version + 1);
     }
 
     public void ReduceStock(int quantity)

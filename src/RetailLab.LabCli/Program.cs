@@ -1,5 +1,3 @@
-using Microsoft.Data.Sqlite;
-using Microsoft.EntityFrameworkCore;
 using RetailLab.Data;
 using RetailLab.LabCli;
 
@@ -13,23 +11,9 @@ try
             "LabPrototype1")
         : Path.GetFullPath(configuredDataDirectory);
 
-    Directory.CreateDirectory(databaseDirectory);
+    var database = new RetailLabSqliteDatabase(databaseDirectory);
 
-    var databasePath = Path.Combine(databaseDirectory, "retaillab.db");
-    var connectionString = new SqliteConnectionStringBuilder
-    {
-        DataSource = databasePath,
-        ForeignKeys = true
-    }.ToString();
-
-    RetailLabDbContext CreateDbContext()
-    {
-        var options = new DbContextOptionsBuilder<RetailLabDbContext>()
-            .UseSqlite(connectionString)
-            .Options;
-
-        return new RetailLabDbContext(options);
-    }
+    RetailLabDbContext CreateDbContext() => database.CreateDbContext();
 
     await using (var dbContext = CreateDbContext())
     {

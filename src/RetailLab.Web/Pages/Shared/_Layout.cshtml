@@ -16,6 +16,7 @@
                 <a asp-page="/Products">Catalogue</a>
                 <a asp-page="/Favourites">Favourites</a>
                 <a asp-page="/Basket">Basket</a>
+                <a asp-page="/Orders/Index">Orders</a>
             </nav>
             <div class="header-auth">
                 @if (User.Identity?.IsAuthenticated == true)
@@ -46,7 +47,7 @@
     </main>
     <footer class="site-footer">
         <div class="wrap">
-            <p>RetailLab demonstration store. Simulated catalogue; no real ordering.</p>
+            <p>RetailLab demonstration store. Simulated catalogue and ordering; no real payment.</p>
         </div>
     </footer>
 </body>

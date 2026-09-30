@@ -7,8 +7,33 @@ public sealed class OrderService(IRetailRepository repository, TimeProvider time
         IEnumerable<OrderItemRequest> requestedItems,
         CancellationToken cancellationToken = default)
     {
+        var order = await StageAsync(customerIdentifier, requestedItems, cancellationToken: cancellationToken);
+        await repository.SaveProductChangesAsync(cancellationToken);
+        return order;
+    }
+
+    /// <summary>
+    /// Validates a complete order request and stages every change (stock
+    /// reductions, snapshot lines, audit records, the order itself) without
+    /// saving. Web checkout stages through this same method so both ordering
+    /// paths share one implementation, then adds basket removal to the same
+    /// atomic save.
+    /// </summary>
+    internal async Task<Order> StageAsync(
+        string customerIdentifier,
+        IEnumerable<OrderItemRequest> requestedItems,
+        Guid? prescribedOrderId = null,
+        CancellationToken cancellationToken = default)
+    {
         var normalizedCustomerIdentifier = CustomerIdentifier.Normalize(customerIdentifier);
         ArgumentNullException.ThrowIfNull(requestedItems);
+
+        if (prescribedOrderId is Guid prescribed && prescribed == Guid.Empty)
+        {
+            throw new ArgumentException(
+                "A prescribed order id must not be empty.",
+                nameof(prescribedOrderId));
+        }
 
         var requests = requestedItems.ToList();
         if (requests.Count == 0)
@@ -57,7 +82,9 @@ public sealed class OrderService(IRetailRepository repository, TimeProvider time
             productsAndQuantities.Add((product, request.Quantity));
         }
 
-        var order = new Order(normalizedCustomerIdentifier, timeProvider.GetUtcNow());
+        var order = prescribedOrderId.HasValue
+            ? new Order(prescribedOrderId.Value, normalizedCustomerIdentifier, timeProvider.GetUtcNow())
+            : new Order(normalizedCustomerIdentifier, timeProvider.GetUtcNow());
 
         foreach (var (product, quantity) in productsAndQuantities)
         {
@@ -74,8 +101,6 @@ public sealed class OrderService(IRetailRepository repository, TimeProvider time
         }
 
         repository.AddOrder(order);
-        await repository.SaveChangesAsync(cancellationToken);
-
         return order;
     }
 }

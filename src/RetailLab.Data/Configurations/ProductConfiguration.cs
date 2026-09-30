@@ -33,6 +33,10 @@ internal sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
 
         builder.Property(product => product.StockQuantity).IsRequired();
 
+        builder.Property(product => product.Version)
+            .IsConcurrencyToken()
+            .IsRequired();
+
         builder.Property(product => product.IsArchived).IsRequired();
 
         builder.Property(product => product.ArchivedAtUtc);

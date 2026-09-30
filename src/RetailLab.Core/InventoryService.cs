@@ -43,7 +43,7 @@ public sealed class InventoryService(IRetailRepository repository, TimeProvider 
         product.AdjustStock(quantityChange);
 
         repository.AddInventoryAdjustment(adjustment);
-        await repository.SaveChangesAsync(cancellationToken);
+        await repository.SaveProductChangesAsync(cancellationToken);
 
         return adjustment;
     }

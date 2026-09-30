@@ -75,6 +75,10 @@ public sealed class ConsoleRetailApp(
             {
                 Console.WriteLine($"Unable to complete that action: {exception.Message}");
             }
+            catch (ProductConflictException exception)
+            {
+                Console.WriteLine($"Please try again: {exception.Message}");
+            }
             catch (ArgumentException exception)
             {
                 Console.WriteLine($"Invalid input: {exception.Message}");

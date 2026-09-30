@@ -1,0 +1,26 @@
+@page
+@model RetailLab.Web.Pages.Orders.IndexModel
+@{
+    ViewData["Title"] = "Orders";
+}
+
+<h1>Your orders</h1>
+<p>Simulated orders for demonstration. No payment was processed for any order shown here.</p>
+
+@if (Model.Orders.Count == 0)
+{
+    <p>You have not placed any orders yet.</p>
+    <p><a asp-page="/Products">Browse the catalogue</a> to get started.</p>
+}
+else
+{
+    <ul class="cards">
+        @foreach (var order in Model.Orders)
+        {
+            <li class="card">
+                <h2><a asp-page="/Orders/Details" asp-route-id="@order.Id">Order placed @order.PlacedAtDisplay</a></h2>
+                <p>@order.ItemsDisplay, total @order.TotalDisplay</p>
+            </li>
+        }
+    </ul>
+}

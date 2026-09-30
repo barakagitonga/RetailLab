@@ -11,6 +11,7 @@ namespace RetailLab.Web.Pages;
 [Authorize]
 public class BasketModel(
     BasketService basket,
+    CheckoutService checkout,
     CatalogDisplayMapper mapper,
     UserManager<IdentityUser> users) : PageModel
 {
@@ -22,6 +23,13 @@ public class BasketModel(
 
     public string BasketTotalDisplay { get; private set; } =
         CatalogDisplayMapper.FormatPrice(0);
+
+    /// <summary>
+    /// Fresh server-generated checkout-attempt identifier per render. It
+    /// doubles as the new order's id, so a repeated submission resolves to
+    /// the original order instead of creating another one.
+    /// </summary>
+    public Guid CheckoutAttemptId { get; private set; }
 
     [TempData]
     public string? StatusMessage { get; set; }
@@ -41,6 +49,7 @@ public class BasketModel(
         Items = items.Select(mapper.ToBasketLine).ToList();
         BasketTotalDisplay = CatalogDisplayMapper.FormatPrice(
             items.Sum(item => item.Product.Price * item.Quantity));
+        CheckoutAttemptId = Guid.NewGuid();
         return Page();
     }
 
@@ -121,6 +130,34 @@ public class BasketModel(
         }
 
         return RedirectToLocal(returnUrl, BasketPath);
+    }
+
+    public async Task<IActionResult> OnPostCheckoutAsync(Guid? checkoutAttemptId)
+    {
+        var customerId = CurrentCustomerId();
+        if (customerId is null)
+        {
+            return Challenge();
+        }
+
+        try
+        {
+            // A missing or unparseable attempt id binds as null; the service
+            // rejects it as an expired checkout.
+            var order = await checkout.CheckoutBasketAsync(customerId, checkoutAttemptId ?? Guid.Empty);
+            StatusMessage = "Your simulated order was placed.";
+            return RedirectToPage("/Orders/Details", new { id = order.Id });
+        }
+        catch (BusinessRuleException exception)
+        {
+            ErrorMessage = exception.Message;
+        }
+        catch (CheckoutConflictException)
+        {
+            ErrorMessage = "Your basket or a product changed; please review your basket and try again.";
+        }
+
+        return RedirectToLocal(returnUrl: null, BasketPath);
     }
 
     private string? CurrentCustomerId() => users.GetUserId(User);

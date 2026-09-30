@@ -1,0 +1,227 @@
+using System.Windows;
+using System.Windows.Controls;
+using RetailLab.Core;
+using RetailLab.Data;
+
+namespace RetailLab.Desktop;
+
+public partial class MainWindow : Window
+{
+    private const string StaffActor = "staff-desktop-01";
+
+    private readonly Func<RetailLabDbContext> createDbContext;
+    private readonly TimeProvider timeProvider;
+    private bool isBusy;
+
+    public MainWindow(
+        Func<RetailLabDbContext> createDbContext,
+        TimeProvider timeProvider)
+    {
+        ArgumentNullException.ThrowIfNull(createDbContext);
+        ArgumentNullException.ThrowIfNull(timeProvider);
+
+        this.createDbContext = createDbContext;
+        this.timeProvider = timeProvider;
+
+        InitializeComponent();
+    }
+
+    private async void Window_Loaded(object sender, RoutedEventArgs e)
+    {
+        await RefreshProductsAsync();
+    }
+
+    private void InventoryGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        UpdateSelectionPanel();
+    }
+
+    private async void ApplyAdjustmentButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (InventoryGrid.SelectedItem is not InventoryProductRow selected)
+        {
+            SetStatus("Select a product before applying an adjustment.", isError: true);
+            return;
+        }
+
+        if (!int.TryParse(QuantityChangeTextBox.Text.Trim(), out var quantityChange))
+        {
+            SetStatus("Quantity change must be a whole number such as 5 or -3.", isError: true);
+            QuantityChangeTextBox.Focus();
+            return;
+        }
+
+        if (quantityChange == 0)
+        {
+            SetStatus(
+                "Quantity change cannot be zero. Enter a positive number to add stock or a negative number to remove it.",
+                isError: true);
+            QuantityChangeTextBox.Focus();
+            return;
+        }
+
+        var reason = ReasonTextBox.Text;
+
+        if (string.IsNullOrWhiteSpace(reason))
+        {
+            SetStatus("Enter a reason for the adjustment.", isError: true);
+            ReasonTextBox.Focus();
+            return;
+        }
+
+        if (reason.Trim().Length > InventoryAdjustment.MaximumReasonLength)
+        {
+            SetStatus(
+                $"Reason cannot exceed {InventoryAdjustment.MaximumReasonLength} characters.",
+                isError: true);
+            ReasonTextBox.Focus();
+            return;
+        }
+
+        if (quantityChange < 0)
+        {
+            long removal = -(long)quantityChange;
+            if (removal > selected.StockQuantity)
+            {
+                SetStatus(
+                    $"Cannot remove {removal} from {selected.Sku}: current stock is {selected.StockQuantity}, so the maximum you can remove is {selected.StockQuantity}.",
+                    isError: true);
+                QuantityChangeTextBox.Focus();
+                return;
+            }
+        }
+
+        SetBusy(true);
+
+        try
+        {
+            await using var dbContext = createDbContext();
+            var service = new InventoryService(new EfRetailRepository(dbContext), timeProvider);
+            var adjustment = await service.AdjustAsync(
+                selected.Sku,
+                quantityChange,
+                reason,
+                StaffActor);
+
+            QuantityChangeTextBox.Clear();
+            ReasonTextBox.Clear();
+
+            await RefreshProductsAsync(
+                selected.Sku,
+                $"Recorded {adjustment.QuantityChange:+0;-0} for {selected.Sku}. " +
+                $"New stock: {adjustment.ResultingQuantity}.");
+        }
+        catch (BusinessRuleException exception)
+        {
+            SetStatus(exception.Message, isError: true);
+        }
+        catch (ProductConflictException exception)
+        {
+            SetStatus($"Inventory changed elsewhere. Refresh and try again. {exception.Message}", isError: true);
+        }
+        catch (ArgumentException exception) when (string.Equals(
+            exception.ParamName,
+            "reason",
+            StringComparison.Ordinal))
+        {
+            if (reason.Trim().Length > InventoryAdjustment.MaximumReasonLength)
+            {
+                SetStatus(
+                    $"Reason cannot exceed {InventoryAdjustment.MaximumReasonLength} characters.",
+                    isError: true);
+            }
+            else
+            {
+                SetStatus("Enter a reason for the adjustment.", isError: true);
+            }
+
+            ReasonTextBox.Focus();
+        }
+        catch (ArgumentException)
+        {
+            SetStatus(
+                "The adjustment details were not valid. Enter a whole-number quantity change and a reason, then try again.",
+                isError: true);
+            QuantityChangeTextBox.Focus();
+        }
+        catch (Exception exception)
+        {
+            SetStatus($"The adjustment could not be saved. {exception.Message}", isError: true);
+        }
+        finally
+        {
+            SetBusy(false);
+        }
+    }
+
+    private async Task RefreshProductsAsync(
+        string? preferredSku = null,
+        string? successMessage = null)
+    {
+        SetBusy(true);
+
+        try
+        {
+            await using var dbContext = createDbContext();
+            var repository = new EfRetailRepository(dbContext);
+            var products = await repository.GetProductsAsync(includeArchived: true);
+            var rows = products.Select(InventoryProductRow.FromProduct).ToList();
+
+            InventoryGrid.ItemsSource = rows;
+            InventoryGrid.SelectedItem = rows.FirstOrDefault(
+                row => string.Equals(row.Sku, preferredSku, StringComparison.OrdinalIgnoreCase));
+
+            if (InventoryGrid.SelectedItem is null && rows.Count > 0)
+            {
+                InventoryGrid.SelectedIndex = 0;
+            }
+
+            SetStatus(successMessage ?? $"Loaded {rows.Count} products from local storage.");
+        }
+        catch (Exception exception)
+        {
+            SetStatus($"Inventory could not be loaded. {exception.Message}", isError: true);
+        }
+        finally
+        {
+            SetBusy(false);
+        }
+    }
+
+    private void UpdateSelectionPanel()
+    {
+        if (InventoryGrid.SelectedItem is not InventoryProductRow selected)
+        {
+            SelectedSkuTextBlock.Text = "Select a product";
+            SelectedDescriptionTextBlock.Text = string.Empty;
+            SelectedStockTextBlock.Text = string.Empty;
+            ApplyAdjustmentButton.IsEnabled = false;
+            return;
+        }
+
+        SelectedSkuTextBlock.Text = selected.Sku;
+        SelectedDescriptionTextBlock.Text = selected.Description;
+        SelectedStockTextBlock.Text = selected.IsArchived
+            ? $"Stock: {selected.StockQuantity} · Archived"
+            : $"Current stock: {selected.StockQuantity}";
+
+        ApplyAdjustmentButton.IsEnabled = !isBusy && !selected.IsArchived;
+    }
+
+    private void SetBusy(bool busy)
+    {
+        isBusy = busy;
+        InventoryGrid.IsEnabled = !busy;
+        QuantityChangeTextBox.IsEnabled = !busy;
+        ReasonTextBox.IsEnabled = !busy;
+        UpdateSelectionPanel();
+    }
+
+    private void SetStatus(string message, bool isError = false)
+    {
+        StatusTextBlock.Text = message;
+        StatusTextBlock.Foreground = isError
+            ? System.Windows.Media.Brushes.DarkRed
+            : (System.Windows.Media.Brush)FindResource("InkBrush");
+    }
+}
