@@ -155,6 +155,26 @@ Signed-in customers convert their basket into a simulated order from the basket 
 
 Run the website, register an account, add products to the basket, and press "Place simulated order": the confirmation shows snapshot lines and the order total with an explicit no-payment notice, and `/Orders` lists the new order. Press the browser Back button and submit again to see the same confirmation rather than a second order. To re-run from scratch, point `RETAILLAB_DATA_DIRECTORY` at a fresh empty folder before starting.
 
+## Tutorial 6A: local desktop inventory adjustment
+
+Status: implemented in `RetailLab.Desktop`.
+
+Store staff can run a Windows WPF workspace over the same local SQLite database while offline. The first deliberately small workflow shows exact stock for every product and records audited stock corrections.
+
+- Active and archived products are listed with SKU, description, price, exact stock, and state.
+- Selecting an active product enables a signed quantity change and required free-text reason. Positive values add stock; negative values remove stock.
+- Archived products remain visible but cannot be adjusted until they are unarchived through an existing staff workflow.
+- Successful adjustments refresh the selected row and show the resulting quantity.
+- The fixed demonstration actor is `staff-desktop-01`; staff authentication and roles are a later slice.
+- Existing Core rules reject zero changes, blank or overlong reasons, archived products, and changes that would produce negative stock.
+- Validation messages are staff-friendly and do not expose programmer exception details.
+- Optimistic concurrency reports a friendly retry message if another process changes the product first.
+- Startup applies existing migrations and seed behavior without recreating or deleting useful data.
+
+### Trying the desktop workflow
+
+From Windows, run `dotnet run --project src/RetailLab.Desktop`, select an active product, enter `5` and a reason such as `Delivery received`, then apply the adjustment. Confirm the row increases by five. Try `0`, a blank reason, and a negative change larger than current stock to see friendly validation without a stock change. Shorten the window and use the adjustment panel's vertical scrollbar to reach the lower controls and Apply button. Set `RETAILLAB_DATA_DIRECTORY` before launch to use an isolated database.
+
 ## Scope boundaries
 
-No desktop UI, staff administration, synchronization, search, pagination, deployment, or SaaS tenancy is implemented yet. Ordering is simulated end to end: the website and console share one ordering implementation with no payment processing. Simultaneous checkouts and staff edits resolve through optimistic-concurrency retries rather than locking.
+Desktop product creation/editing, staff authentication and roles, synchronization, search, pagination, deployment, and SaaS tenancy are not implemented yet. Ordering is simulated end to end: the website and console share one ordering implementation with no payment processing. Simultaneous checkouts and staff edits resolve through optimistic-concurrency retries rather than locking.

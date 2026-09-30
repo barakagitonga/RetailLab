@@ -12,9 +12,8 @@ All projects target .NET 10 with nullable reference checking and implicit import
 | `src/RetailLab.Data` | EF Core SQLite context, mappings, repository, migrations, and idempotent sample-data initialization. |
 | `src/RetailLab.LabCli` | Interactive Lab Prototype 1 console interface plus staff product and inventory workflow, and application startup. |
 | `src/RetailLab.Web` | Customer storefront (Razor Pages): home, catalogue, product details, Identity-backed accounts, per-customer favourites, a per-customer basket, and simulated basket checkout with order history over the same Core and Data layers. |
+| `src/RetailLab.Desktop` | Windows WPF staff interface: exact local inventory and one audited stock-adjustment workflow over Core and Data. |
 | `tests/RetailLab.Tests` | Core unit tests, Web display and redirect-policy tests, and SQLite integration tests (including standard Identity account flows, basket persistence conflicts, and checkout plus product-concurrency races). |
-
-No Desktop project exists yet.
 
 ## Project dependencies
 
@@ -23,10 +22,19 @@ RetailLab.Core   -> no other projects
 RetailLab.Data   -> RetailLab.Core, EF Core SQLite
 RetailLab.LabCli -> RetailLab.Core, RetailLab.Data
 RetailLab.Web    -> RetailLab.Core, RetailLab.Data
+RetailLab.Desktop-> RetailLab.Core, RetailLab.Data
 RetailLab.Tests  -> RetailLab.Core, RetailLab.Data, RetailLab.Web (for display-model tests only)
 ```
 
 Core therefore remains reusable by later Razor Pages and WPF interfaces without depending on those technologies or on EF Core. The test project references Web only so mapper and redirect-policy tests compile against web models; the reference points one way and production code is unaffected. Data references the `Microsoft.AspNetCore.Identity.EntityFrameworkCore` package for the standard Identity store.
+
+## Desktop layer
+
+`RetailLab.Desktop` is a Windows-only WPF presentation layer. `MainWindow` loads staff-facing `InventoryProductRow` display records, creates a fresh DbContext for each load or adjustment, and calls the existing `InventoryService`. It contains input parsing and status-message presentation, but no stock rule: zero changes, negative-result prevention, archived-product rejection, audit creation, and concurrency protection remain below the UI.
+
+The first slice intentionally uses XAML plus focused code-behind rather than adding an MVVM framework. This keeps the learning surface small while the code-behind acts only as a presentation coordinator. If the desktop application gains several screens or richer state, a dedicated view-model layer can be introduced based on demonstrated need.
+
+`RetailLabSqliteDatabase` in Data owns local SQLite connection-string and DbContext construction. LabCli, Web, and Desktop use it from their composition roots, while each interface still decides how to obtain its configured data directory. Desktop startup runs the shared migration-and-seed initializer before showing the window.
 
 ## Lab Prototype 1 model
 
@@ -128,6 +136,17 @@ Browser GET
     -> Razor HTML + local CSS
 ```
 
+Desktop adjustment:
+
+```text
+WPF selection + signed quantity + reason
+    -> InventoryService (Core validation and audit creation)
+    -> IRetailRepository.SaveProductChangesAsync
+    -> EF Core DbContext
+    -> local SQLite (product stock + InventoryAdjustment in one save)
+    -> refreshed staff display + status message
+```
+
 Browser POST (a signed-in favourite change):
 
 ```text
@@ -163,8 +182,8 @@ Browser POST + antiforgery token + checkout-attempt id
 
 A successful order tracks stock changes, inventory adjustments, a new order, and all new lines (and, for web checkout, basket deletions) in one DbContext. `SaveChangesAsync` persists them in one relational transaction. A staff adjustment tracks the stock change and its audit record the same way. Invalid or insufficient-stock requests fail before any product is changed; invalid reasons or actors fail before stock is mutated.
 
-The database defaults to `%LOCALAPPDATA%\RetailLab\LabPrototype1\retaillab.db`. The `RETAILLAB_DATA_DIRECTORY` environment variable can select an isolated location for development, and both the console and the website honor it so they can deliberately share one local database.
+The database defaults to `%LOCALAPPDATA%\RetailLab\LabPrototype1\retaillab.db`. The `RETAILLAB_DATA_DIRECTORY` environment variable can select an isolated location for development, and the console, website, and desktop application honor it so they can deliberately share one local database.
 
 ## Deferred architecture
 
-Staff administration and roles, WPF, synchronization, search, pagination, deployment, and SaaS tenancy are not implemented yet. Shared models do not imply that future server and offline desktop applications will share one physical database file.
+Desktop product creation/editing, staff authentication and roles, synchronization, search, pagination, deployment, and SaaS tenancy are not implemented yet. Shared models do not imply that future server and offline desktop applications will share one physical database file.

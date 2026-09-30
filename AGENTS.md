@@ -119,6 +119,15 @@ For architecture changes or tasks affecting several files, present the plan befo
 
 Small obvious corrections may be implemented directly.
 
+## AI team workflow
+
+- The human owner directs work and approves decisions.
+- Familiar high-level assistants such as ChatGPT/Codex, Gemini, or Claude handle high-level reasoning, planning, architecture, review, and difficult debugging.
+- Muse Code CLI is the default implementation agent for code generation, applying approved designs/decisions/structure, implementation-time debugging, tests, and documentation.
+- Workflow: high-level assistant inspects and plans; Muse implements; high-level assistant reviews and independently verifies; human manually tests and approves.
+- Do not silently bypass this division. If Muse is unavailable or blocked, report it and ask before a high-level assistant directly implements production changes.
+- All existing architecture, safety, testing, and no-auto-commit rules still apply.
+
 ## AI-assisted learning rules
 
 Do not hide important implementation decisions from the developer.

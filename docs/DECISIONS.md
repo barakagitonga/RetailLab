@@ -135,6 +135,21 @@ Consequences:
 - `BookmarkService` keeps the raw save: bookmarks carry no concurrency token, and its pre-existing duplicate-add behavior is unchanged.
 - Version races are covered by SQLite integration tests (staff update-vs-update, adjust-vs-adjust, console order-vs-order, final-unit checkout race, price/archive-after-load rollback); the in-memory test double enforces no concurrency by design.
 
+## D014 - First WPF slice is local inventory adjustment
+
+Status: approved and implemented (Tutorial 6A).
+
+Create `RetailLab.Desktop` as a .NET 10 Windows WPF application whose first vertical slice lists exact inventory and applies audited stock adjustments. It uses the same local SQLite database, migrations, `InventoryService`, repository implementation, optimistic-concurrency behavior, and fixed demonstration-data conventions as the console. The desktop actor label is `staff-desktop-01`; it is not authentication.
+
+Reason: inventory adjustment is already a complete, well-tested Core workflow and gives the desktop application a meaningful offline task without prematurely adding navigation, roles, synchronization, or a UI framework. XAML owns layout, a small display record owns staff-facing labels, and focused code-behind coordinates contexts and services without implementing business rules.
+
+Consequences:
+
+- Active and archived products are visible, but Core continues to reject adjustments to archived products.
+- A new `RetailLabSqliteDatabase` Data helper centralizes local SQLite connection-string and DbContext construction; no production package was added.
+- Product creation, detail editing, archive/unarchive controls, and adjustment-history UI remain later desktop slices.
+- Automated tests continue to cover Core and SQLite behavior; XAML compilation is covered by the solution build, and layout/interaction require a Windows manual check.
+
 ## Open decisions
 
 | Question | Resolve before |

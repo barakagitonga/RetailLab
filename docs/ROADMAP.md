@@ -63,11 +63,20 @@ Outcome: a signed-in customer can submit the basket as a simulated order and vie
 
 ## 6. Local staff inventory application
 
-Proposed outcome: staff can use a WPF application with local SQLite storage while offline.
+### 6A. Inventory list and audited stock adjustment
 
-- Create `RetailLab.Desktop` only when this slice is approved.
-- Reuse Core rules and Data patterns.
-- Demonstrate one clear inventory workflow before expanding it.
+Status: implemented in `RetailLab.Desktop` (Tutorial 6A).
+
+Outcome: staff can open a Windows WPF application, review exact stock for active and archived products, select an active product, and record a signed stock adjustment with a required reason while using local SQLite offline.
+
+- The desktop layer coordinates `InventoryService`; validation, negative-stock protection, UTC timestamps, audit records, and optimistic concurrency remain in Core and Data.
+- Archived products remain visible for staff context but cannot be adjusted.
+- `RetailLabSqliteDatabase` centralizes local SQLite connection and DbContext construction for application composition roots.
+- No WPF framework or other production package was added; XAML and focused code-behind provide the first deliberately small workflow.
+
+### 6B. Expanded staff workflows
+
+Proposed outcome: bring product creation, detail editing, archive/unarchive controls, and adjustment history from the console into focused desktop workflows after 6A is reviewed.
 
 ## 7. Desktop and server synchronization
 

@@ -1,5 +1,4 @@
 using Microsoft.AspNetCore.Identity;
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using RetailLab.Core;
 using RetailLab.Data;
@@ -33,16 +32,9 @@ var databaseDirectory = string.IsNullOrWhiteSpace(configuredDataDirectory)
         "LabPrototype1")
     : Path.GetFullPath(configuredDataDirectory);
 
-Directory.CreateDirectory(databaseDirectory);
+var database = new RetailLabSqliteDatabase(databaseDirectory);
 
-var databasePath = Path.Combine(databaseDirectory, "retaillab.db");
-var connectionString = new SqliteConnectionStringBuilder
-{
-    DataSource = databasePath,
-    ForeignKeys = true
-}.ToString();
-
-builder.Services.AddDbContext<RetailLabDbContext>(options => options.UseSqlite(connectionString));
+builder.Services.AddDbContext<RetailLabDbContext>(options => options.UseSqlite(database.ConnectionString));
 builder.Services.AddScoped<IRetailRepository, EfRetailRepository>();
 builder.Services.AddScoped<CatalogService>();
 builder.Services.AddScoped<BookmarkService>();
@@ -66,7 +58,7 @@ catch (Exception exception)
 {
     // Startup failure: log the full detail for the operator, tell the user only
     // that the catalogue is unavailable, and do not start serving requests.
-    app.Logger.LogCritical(exception, "RetailLab database initialization failed for {DatabasePath}", databasePath);
+    app.Logger.LogCritical(exception, "RetailLab database initialization failed for {DatabasePath}", database.DatabasePath);
     Console.Error.WriteLine("RetailLab could not start: the catalogue database is unavailable.");
     return 1;
 }
