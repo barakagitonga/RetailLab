@@ -194,6 +194,25 @@ Store staff can select any product, including an archived product, and open a fo
 
 From Windows, run `dotnet run --project src/RetailLab.Desktop`, select a product with existing adjustment history, and press `View adjustment history`. Confirm the newest records appear first with correct change, resulting stock, reason, actor, and UTC time. Select a product with no history and confirm the friendly empty state, then open history for an archived product to confirm it remains viewable. Close the window and confirm the workspace is unchanged, then apply a small adjustment to an active product to confirm the existing workflow still works. Set `RETAILLAB_DATA_DIRECTORY` before launch to use an isolated database.
 
+## Tutorial 6C: desktop product creation and inventory refresh
+
+Status: implemented in `RetailLab.Desktop`.
+
+Store staff can create products without leaving the inventory workspace, and explicitly refresh the list after another interface changes the shared local database.
+
+- A compact action area above the inventory grid offers `New product` and `Refresh inventory`; both are disabled while the main window is busy.
+- `New product` opens a focused modal dialog (SKU, description, price, initial stock) owned by the main window.
+- SKU and description are required with Core-owned maximum lengths; price must be a nonnegative decimal parsed in the current culture; initial stock must be a nonnegative whole number, and zero is allowed.
+- The dialog passes values through untouched: Core trims, validates, preserves SKU casing, and rejects duplicate SKUs case-insensitively with a friendly message that keeps the dialog open.
+- Initial stock is the product's starting value and does not create an inventory-adjustment record.
+- Successful creation closes the dialog, refreshes the grid, selects the new product, and reports the SKU and starting stock; cancelling changes nothing.
+- `Refresh inventory` reloads with a fresh DbContext, preserves the selected SKU when it still exists, and updates rows plus Apply/History availability from listings changed elsewhere (for example archiving through the console).
+- Failures show safe staff-facing text without raw database or programmer details, and controls re-enable after a failed save.
+
+### Trying creation and refresh
+
+From Windows, run `dotnet run --project src/RetailLab.Desktop` and press `New product`: create a valid product and confirm it appears selected, then refresh the web catalogue in a browser to see it listed. Try the same SKU in different casing for the friendly duplicate message, plus blank and overlong SKU/description, nonnumeric and negative price, and nonnumeric and negative stock; confirm zero stock is accepted and that Cancel changes nothing. In the console, archive or unarchive a product, then press `Refresh inventory` in Desktop and confirm the state and button availability update. Finish by applying an adjustment and opening history to confirm those workflows still work. Set `RETAILLAB_DATA_DIRECTORY` before launch to share one database between interfaces or to use an isolated folder.
+
 ## Scope boundaries
 
-Desktop product creation/editing, staff authentication and roles, synchronization, search, pagination, deployment, and SaaS tenancy are not implemented yet. Ordering is simulated end to end: the website and console share one ordering implementation with no payment processing. Simultaneous checkouts and staff edits resolve through optimistic-concurrency retries rather than locking.
+Desktop product editing and archive controls, staff authentication and roles, synchronization, search, pagination, deployment, and SaaS tenancy are not implemented yet. Ordering is simulated end to end: the website and console share one ordering implementation with no payment processing. Simultaneous checkouts and staff edits resolve through optimistic-concurrency retries rather than locking.

@@ -84,9 +84,21 @@ Outcome: staff can select any product, including an archived product, and open a
 - Core and Data are unchanged: no schema migration, no business-rule change, no new package.
 - No MVVM framework was added; XAML and focused code-behind remain sufficient for two windows.
 
-### 6C. Expanded staff workflows
+### 6C. Desktop product creation and inventory refresh
 
-Proposed outcome: bring product creation, detail editing, and archive/unarchive controls from the console into focused desktop workflows after 6B is reviewed.
+Status: implemented in `RetailLab.Desktop` (Tutorial 6C).
+
+Outcome: staff can create products through a focused modal dialog and explicitly refresh the inventory list after another interface changes the shared local database.
+
+- The creation dialog validates for immediate friendly feedback and persists only through `ProductService.CreateAsync`; Core owns lengths, nonnegative price/stock, casing preservation, and case-insensitive duplicate rejection.
+- Refresh reuses the existing inventory load with a fresh DbContext and preserves the selected SKU when it still exists.
+- Core and Data are unchanged: no schema migration, no business-rule change, no new package, no MVVM framework.
+
+### 6D. Desktop product editing and archive controls
+
+Proposed outcome: bring detail editing and archive/unarchive controls from the console into focused desktop workflows after 6C is reviewed.
+
+Design concerns to resolve first: stale-form concurrency (another interface changing the product while the edit form is open) and destructive-action confirmation UX for archiving.
 
 ## 7. Desktop and server synchronization
 

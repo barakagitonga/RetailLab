@@ -62,7 +62,28 @@
                 <ColumnDefinition Width="360" />
             </Grid.ColumnDefinitions>
 
-            <Border Padding="1"
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                    <Button x:Name="NewProductButton"
+                            MinWidth="140"
+                            automation:AutomationProperties.Name="New product"
+                            Content="New product"
+                            Click="NewProductButton_Click" />
+                    <Button x:Name="RefreshInventoryButton"
+                            Margin="12,0,0,0"
+                            MinWidth="170"
+                            automation:AutomationProperties.Name="Refresh inventory"
+                            Content="Refresh inventory"
+                            Click="RefreshInventoryButton_Click" />
+                </StackPanel>
+
+                <Border Grid.Row="1"
+                        Padding="1"
                     Background="White"
                     BorderBrush="#D7DDD9"
                     BorderThickness="1"
@@ -89,6 +110,8 @@
                     </DataGrid.Columns>
                 </DataGrid>
             </Border>
+
+            </Grid>
 
             <Border Grid.Column="2"
                     Padding="24"

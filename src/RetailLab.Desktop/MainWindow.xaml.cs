@@ -36,6 +36,29 @@ public partial class MainWindow : Window
         UpdateSelectionPanel();
     }
 
+    private async void NewProductButton_Click(object sender, RoutedEventArgs e)
+    {
+        var createWindow = new CreateProductWindow(createDbContext, timeProvider)
+        {
+            Owner = this
+        };
+
+        if (createWindow.ShowDialog() == true &&
+            createWindow.CreatedSku is string createdSku &&
+            createWindow.CreatedStockQuantity is int createdStock)
+        {
+            await RefreshProductsAsync(
+                createdSku,
+                $"Created product {createdSku} with starting stock {createdStock}.");
+        }
+    }
+
+    private async void RefreshInventoryButton_Click(object sender, RoutedEventArgs e)
+    {
+        var selectedSku = (InventoryGrid.SelectedItem as InventoryProductRow)?.Sku;
+        await RefreshProductsAsync(selectedSku);
+    }
+
     private void ViewHistoryButton_Click(object sender, RoutedEventArgs e)
     {
         if (InventoryGrid.SelectedItem is not InventoryProductRow selected)
@@ -229,6 +252,8 @@ public partial class MainWindow : Window
     {
         isBusy = busy;
         InventoryGrid.IsEnabled = !busy;
+        NewProductButton.IsEnabled = !busy;
+        RefreshInventoryButton.IsEnabled = !busy;
         QuantityChangeTextBox.IsEnabled = !busy;
         ReasonTextBox.IsEnabled = !busy;
         UpdateSelectionPanel();
