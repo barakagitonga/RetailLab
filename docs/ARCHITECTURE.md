@@ -234,4 +234,4 @@ The database defaults to `%LOCALAPPDATA%\RetailLab\LabPrototype1\retaillab.db`. 
 
 ## Deferred architecture
 
-Desktop product creation/editing, staff authentication and roles, synchronization, search, pagination, deployment, and SaaS tenancy are not implemented yet. Shared models do not imply that future server and offline desktop applications will share one physical database file.
+Staff authentication and roles, synchronization, search, pagination, deployment, and SaaS tenancy are not implemented yet. The future database boundary is explicit: the website will use an authoritative server-side database while each desktop installation keeps its own offline SQLite database, coordinated by the push-then-pull protocol in `docs/SYNCHRONIZATION.md` — shared Core models never imply one shared physical file.

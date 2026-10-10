@@ -196,6 +196,20 @@ Consequences:
 - Archive stays reversible: stock, orders, baskets, and history are retained, and unarchiving restores customer visibility under existing web rules.
 - XAML compilation is covered by the solution build; edit, confirmation, stale-form, and stale-action flows require a Windows manual check.
 
+## D018 - Synchronization direction: server-authoritative push-then-pull with outbox, inbox, and cursor
+
+Status: approved design direction, not implemented (Tutorial 7A).
+
+Adopt the design in `docs/SYNCHRONIZATION.md`: the server owns the published catalogue and authoritative product state; each desktop keeps an offline local projection and queues immutable staff operations in a local outbox; uploads carry stable GUID OperationIds with server inbox receipts for idempotency; downloads follow a monotonic server change feed via a stored cursor; conflicts surface for human review and never auto-resolve. This lifts the D007 deferral for design purposes only — no sync behavior exists yet.
+
+Reason: local workflows (6A-6D) now clarify the actual requirements D007 was waiting for: which data must move (product management, inventory deltas), which must not (credentials, baskets, favourites, order placement), and which identity hazards exist (random seed GUIDs per database, database-local `Product.Version`). Documenting ownership, identity, pairing, transactions, and trust boundaries before code keeps each implementation slice narrow and prevents a giant framework from growing by accident.
+
+Consequences:
+
+- No production, test, project, migration, package, or database files change in 7A; verification is diff inspection only.
+- Later slices follow the 7B-7E dependency order in the design document; state-changing sync stays gated on a staff-device authentication design.
+- Core keeps its boundaries: future sync contracts may live in Core, but transport and storage stay in Data and the interface projects.
+
 ## Open decisions
 
 | Question | Resolve before |
@@ -203,4 +217,8 @@ Consequences:
 | Permanent retailer brand and multi-currency support (Tutorial 3 uses temporary name RetailLab and USD-at-edge) | Storefront hardening |
 | Stock adjustment reason taxonomy (free text vs enum) and actor roles | Protected web workflows |
 | Staff permissions and roles (customer password sign-in is done) | Protected web workflows |
-| Server storage, data ownership, synchronization transport, and conflict policy | Synchronization implementation |
+| Production server database/storage choice | Synchronization hardening |
+| Synchronization transport/API shape and payload versioning | Synchronization implementation |
+| Exact server-revision and causal-chain metadata | Synchronization implementation |
+| Existing-database pairing strategy for divergent GUIDs | Synchronization implementation |
+| Staff-device authentication mechanism, roles, and enrollment | Authenticated sync upload |

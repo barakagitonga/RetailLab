@@ -91,12 +91,12 @@ The console, website, and desktop application use a local SQLite file. By defaul
 - Commerce is simulated: web and console checkout share one ordering implementation with no real payment processing.
 - No staff login yet: the console and desktop use fixed demo actor labels; only web customers have real accounts so far.
 - Desktop product management assumes one shared local database file; simultaneous changes from another interface resolve through friendly retry messages rather than locking.
-- No synchronization between installations.
+- No synchronization between installations yet; the approved design lives in [docs/SYNCHRONIZATION.md](docs/SYNCHRONIZATION.md).
 - SQLite is a development and offline-demonstration choice, not a multi-user server database.
 
 ## Roadmap
 
-Completed: persistent console retail flow, staff product and inventory management with audit history, the customer catalogue website, customer accounts with isolated favourites, a customer basket with simulated web checkout, the first local WPF inventory-adjustment workflow, desktop adjustment-history viewing, desktop product creation with inventory refresh, and desktop product editing with archive controls. Planned next slices address desktop/server synchronization. Details live in [docs/ROADMAP.md](docs/ROADMAP.md); decisions are logged in [docs/DECISIONS.md](docs/DECISIONS.md).
+Completed: persistent console retail flow, staff product and inventory management with audit history, the customer catalogue website, customer accounts with isolated favourites, a customer basket with simulated web checkout, the first local WPF inventory-adjustment workflow, desktop adjustment-history viewing, desktop product creation with inventory refresh, and desktop product editing with archive controls. The synchronization design is approved in [docs/SYNCHRONIZATION.md](docs/SYNCHRONIZATION.md); planned implementation slices follow it toward desktop/server synchronization. Details live in [docs/ROADMAP.md](docs/ROADMAP.md); decisions are logged in [docs/DECISIONS.md](docs/DECISIONS.md).
 
 ## Testing
 
