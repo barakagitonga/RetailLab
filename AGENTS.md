@@ -121,11 +121,14 @@ Small obvious corrections may be implemented directly.
 
 ## AI team workflow
 
-- The human owner directs work and approves decisions.
-- Familiar high-level assistants such as ChatGPT/Codex, Gemini, or Claude handle high-level reasoning, planning, architecture, review, and difficult debugging.
-- Google Antigravity is the default implementation agent for code generation, applying approved designs, decisions, and structure; managing project files; performing implementation-time on-device debugging; running tests; and updating documentation.
-- Workflow: a high-level assistant inspects and plans; Antigravity implements and performs the initial on-device verification; a high-level assistant reviews the resulting changes and independently verifies them; the human owner manually tests and approves.
-- Do not silently bypass this division. If Antigravity is unavailable or blocked, report it and ask before a high-level assistant directly implements production changes.
+- The human owner directs the project and approves important product and architecture decisions.
+- Muse is the default high-volume assistant for requirements exploration, architecture drafts, documentation drafts, and test planning through the already-available consumer Muse interface.
+- ChatGPT/Codex acts as the local implementation and verification agent. It inspects the repository, reviews proposed designs, edits project files, diagnoses difficult problems, and builds and tests completed work.
+- Muse Code is optional and must not be treated as available when it requires a payment method, pay-as-you-go billing, or a separate subscription. Consumer Muse token balances must not be assumed to apply to Muse Code.
+- Google Antigravity is an optional overflow or second-opinion tool. Its availability is never required to continue development.
+- Recommended workflow: Muse drafts the requirements, design, or implementation plan for a small vertical slice; ChatGPT/Codex reviews the plan, implements it locally, and verifies the result; the human owner manually tests and approves.
+- If one assistant is unavailable or quota-limited, another may perform the work while preserving the same planning, review, testing, and human-approval gates.
+- No assistant may automatically commit changes, enable paid overages, purchase credits, upgrade a subscription, or incur pay-as-you-go usage.
 - All existing architecture, safety, testing, and no-auto-commit rules still apply.
 
 ## AI-assisted learning rules

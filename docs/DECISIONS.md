@@ -12,7 +12,7 @@ Develop RetailLab as both a learning project and a portfolio demonstration using
 
 Status: established and partly implemented.
 
-Use .NET 10, C#, ASP.NET Core with Razor Pages, WPF, Entity Framework Core, SQLite, xUnit, and Git. Tutorials 1 and 2 implement the console, Core, EF Core SQLite, migrations, and xUnit portions; Tutorial 3 adds the Razor Pages catalogue. WPF remains future work.
+Use .NET 10, C#, ASP.NET Core with Razor Pages, WPF, Entity Framework Core, SQLite, xUnit, and Git. Tutorials 1 and 2 implement the console, Core, EF Core SQLite, migrations, and xUnit portions; Tutorial 3 adds the Razor Pages catalogue; and Tutorials 6A–6D implement the initial WPF staff workflows.
 
 ## D003 - Separate business rules, storage, and presentation
 
