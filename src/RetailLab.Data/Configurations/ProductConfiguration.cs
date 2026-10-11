@@ -12,6 +12,7 @@ internal sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
         {
             tableBuilder.HasCheckConstraint("CK_Products_Price", "Price >= 0");
             tableBuilder.HasCheckConstraint("CK_Products_StockQuantity", "StockQuantity >= 0");
+            tableBuilder.HasCheckConstraint("CK_Products_ServerRevision", "ServerRevision >= 0");
         });
 
         builder.HasKey(product => product.Id);
@@ -35,6 +36,10 @@ internal sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
 
         builder.Property(product => product.Version)
             .IsConcurrencyToken()
+            .IsRequired();
+
+        builder.Property(product => product.ServerRevision)
+            .HasDefaultValue(0L)
             .IsRequired();
 
         builder.Property(product => product.IsArchived).IsRequired();

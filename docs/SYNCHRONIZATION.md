@@ -135,10 +135,10 @@ server revision (or base-version) metadata for synchronization:
   server revision the desktop observed for that product, or names its
   predecessor when it extends a local causal chain (section 8).
 - The server compares the operation's base revision against its own
-  authoritative revision to detect stale edits. The exact shape of that
-  metadata (a revision column, a per-product server sequence, or the change
-  feed cursor at read time) is deferred to 7B, as is the exact
-  predecessor/dependency representation for chained operations (section 8).
+  authoritative revision to detect stale edits. Implemented in 7B:
+  `Product.ServerRevision` is a separate non-negative `long` column on `Product`
+  representing the last authoritative server state (independent of `Version`),
+  while global change-feed entries carry an independent monotonic `Sequence`.
 
 ## 7. Desktop pairing and bootstrap
 
@@ -209,8 +209,10 @@ The server returns the new authoritative revision for each accepted
 operation, and retrying any chain member stays safe through `OperationId`
 receipts. Chains never rewrite an operation's original business intent —
 create-then-edit and multiple-edit-before-sync flows work because each step
-keeps its own immutable record linked to the step before it. The exact
-predecessor/dependency representation is deferred to 7B.
+keeps its own immutable record linked to the step before it. Implemented in 7B:
+Core contracts enforce that mutating operations carry exactly one of
+`BaseServerRevision` (based directly on server state) or `PredecessorOperationId`
+(chained behind an unsent local outbox operation). Product creation has neither.
 
 ## 9. Server inbox and idempotency receipts
 
@@ -407,9 +409,12 @@ Each slice stays narrow and independently verifiable:
 - **7A: synchronization boundaries and architecture** — this document.
   Design only; no behavior changes.
 - **7B: stable identity, pairing metadata, sync contracts, and schema
-  foundations** — server revision and causal-chain metadata, outbox/inbox/change-feed tables
-  (via migrations), operation and change contracts; Core contracts stay free
-  of transport and storage concerns.
+  foundations** — implemented: `Product.ServerRevision`, prescribed GUID identity,
+  causal chain contracts (`BaseServerRevision` vs `PredecessorOperationId`),
+  `ProductSnapshot`, `ServerChangeEntry`, `SyncOperationResult`, plus
+  `SyncClientState`, `SyncOutboxEntry`, `SyncInboxReceipt`, and
+  `SyncChangeFeedEntry` persistence tables via `SynchronizationFoundations`
+  migration.
 - **7C: read-only server-to-desktop catalogue bootstrap and incremental
   pull** — pairing for new/empty databases, cursor-tracked downloads, no
   uploads yet.
@@ -427,12 +432,14 @@ dependency order, not marketing names.)
 
 ## 18. Deferred decisions and explicit non-goals
 
+**Resolved in Tutorial 7B.**
+
+- Server revision metadata shape: separate non-negative `ServerRevision` column on `Product` alongside monotonic global change-feed `Sequence`.
+- Causal chain representation: `BaseServerRevision` (for operations based on server state) vs `PredecessorOperationId` (for chained operations extending unsent local operations).
+
 **Deferred (recorded honestly, decided later with evidence).**
 
 - Staff-device authentication mechanism, roles, enrollment, and rotation.
-- Exact server revision metadata shape (column, per-product sequence, or
-  feed cursor at read time).
-- Exact predecessor/dependency metadata representing outbox causal chains.
 - Transport shape (which HTTP endpoints or equivalent, payload versioning).
 - Retry policy details (attempt counts, waits, backoff).
 - Page sizes for pull and batch limits for push.

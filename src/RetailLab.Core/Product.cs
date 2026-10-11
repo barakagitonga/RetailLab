@@ -10,8 +10,18 @@ public sealed class Product
     }
 
     public Product(string sku, string description, decimal price, int stockQuantity)
+        : this(Guid.NewGuid(), sku, description, price, stockQuantity)
     {
-        Id = Guid.NewGuid();
+    }
+
+    public Product(Guid id, string sku, string description, decimal price, int stockQuantity)
+    {
+        if (id == Guid.Empty)
+        {
+            throw new ArgumentException("Product ID cannot be empty.", nameof(id));
+        }
+
+        Id = id;
         Sku = NormalizeRequired(sku, MaximumSkuLength, nameof(sku));
         Description = NormalizeRequired(description, MaximumDescriptionLength, nameof(description));
 
@@ -32,6 +42,7 @@ public sealed class Product
         IsArchived = false;
         ArchivedAtUtc = null;
         Version = 0;
+        ServerRevision = 0;
     }
 
     public Guid Id { get; private set; }
@@ -51,9 +62,37 @@ public sealed class Product
     /// </summary>
     public int Version { get; private set; }
 
+    /// <summary>
+    /// Authoritative server revision representing the latest server state
+    /// observed or applied. Not an EF concurrency token.
+    /// </summary>
+    public long ServerRevision { get; private set; }
+
     public bool IsArchived { get; private set; }
 
     public DateTimeOffset? ArchivedAtUtc { get; private set; }
+
+    /// <summary>
+    /// Applies an authoritative server revision. Rejects negative revisions
+    /// and revision regression. Does not alter local Version.
+    /// </summary>
+    public void ApplyServerRevision(long serverRevision)
+    {
+        if (serverRevision < 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(serverRevision),
+                "Server revision cannot be negative.");
+        }
+
+        if (serverRevision < ServerRevision)
+        {
+            throw new BusinessRuleException(
+                $"Authoritative server revision cannot regress from {ServerRevision} to {serverRevision}.");
+        }
+
+        ServerRevision = serverRevision;
+    }
 
     public void UpdateDetails(string description, decimal price)
     {

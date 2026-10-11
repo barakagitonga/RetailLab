@@ -210,6 +210,26 @@ Consequences:
 - Later slices follow the 7B-7E dependency order in the design document; state-changing sync stays gated on a staff-device authentication design.
 - Core keeps its boundaries: future sync contracts may live in Core, but transport and storage stay in Data and the interface projects.
 
+## D019 - Separate local and server revisions with predecessor-based causal chains and additive sync foundations
+
+Status: approved and implemented (Tutorial 7B).
+
+Adopt separate revision metadata and predecessor-based causal chains:
+- Keep `Product.Version` strictly as the database-local optimistic concurrency token.
+- Add an independent, non-negative `ServerRevision` on `Product` (initially 0), updated only via validated Core operation (`ApplyServerRevision`) that rejects negative values and regressions.
+- Add a constructor supporting prescribed non-empty GUIDs while preserving the default `Guid.NewGuid()` constructor.
+- Represent causal relationships explicitly in Core operation contracts: `CreateProductOperation` carries neither base revision nor predecessor ID; mutating operations (`UpdateProductDetailsOperation`, `ArchiveProductOperation`, `UnarchiveProductOperation`) require exactly one of `BaseServerRevision` (for operations based on authoritative server state) or `PredecessorOperationId` (for operations chained behind unsent local outbox entries).
+- Add persistence-only synchronization entities in Data: singleton `SyncClientState` (with `CK_SyncClientStates_Singleton` enforcing Id = 1 and cursor tracking), `SyncOutboxEntry` (with database-generated monotonic `LocalSequence` and unique `OperationId`), `SyncInboxReceipt` (idempotent receipt keyed by `OperationId`), and `SyncChangeFeedEntry` (monotonic global `Sequence`).
+- Generate an additive migration (`SynchronizationFoundations`) preserving all existing tables and setting `ServerRevision = 0`.
+
+Reason: local optimistic concurrency tokens diverge across distributed databases; treating local versions as server revisions would cause spurious conflicts. Similarly, staff working offline often perform multiple operations on the same product before syncing (e.g. creating then editing a product). Linking operations via predecessor IDs allows the server to evaluate causal chains in order without pretending the client independently observed an updated server revision.
+
+Consequences:
+- `Product.Version` and `Product.ServerRevision` remain strictly independent.
+- Core remains completely free of HTTP, JSON, EF Core, or SQLite transport/storage concerns.
+- Existing databases upgrade smoothly without data loss or GUID rewriting.
+- No network transport, background sync, or UI changes exist yet.
+
 ## Open decisions
 
 | Question | Resolve before |
@@ -219,6 +239,5 @@ Consequences:
 | Staff permissions and roles (customer password sign-in is done) | Protected web workflows |
 | Production server database/storage choice | Synchronization hardening |
 | Synchronization transport/API shape and payload versioning | Synchronization implementation |
-| Exact server-revision and causal-chain metadata | Synchronization implementation |
 | Existing-database pairing strategy for divergent GUIDs | Synchronization implementation |
 | Staff-device authentication mechanism, roles, and enrollment | Authenticated sync upload |

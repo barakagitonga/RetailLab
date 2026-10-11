@@ -385,6 +385,11 @@ namespace RetailLab.Data.Migrations
                         .HasPrecision(18, 2)
                         .HasColumnType("TEXT");
 
+                    b.Property<long>("ServerRevision")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasDefaultValue(0L);
+
                     b.Property<string>("Sku")
                         .IsRequired()
                         .HasMaxLength(40)
@@ -407,7 +412,140 @@ namespace RetailLab.Data.Migrations
                         {
                             t.HasCheckConstraint("CK_Products_Price", "Price >= 0");
 
+                            t.HasCheckConstraint("CK_Products_ServerRevision", "ServerRevision >= 0");
+
                             t.HasCheckConstraint("CK_Products_StockQuantity", "StockQuantity >= 0");
+                        });
+                });
+
+            modelBuilder.Entity("RetailLab.Data.SyncChangeFeedEntry", b =>
+                {
+                    b.Property<long>("Sequence")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("ChangeKind")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTimeOffset>("OccurredAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Payload")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("ServerRevision")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Sequence");
+
+                    b.HasIndex("ProductId");
+
+                    b.ToTable("SyncChangeFeedEntries", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_SyncChangeFeedEntries_ServerRevision", "ServerRevision >= 0");
+                        });
+                });
+
+            modelBuilder.Entity("RetailLab.Data.SyncClientState", b =>
+                {
+                    b.Property<int>("Id")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<Guid>("DeviceId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("LastPulledSequence")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTimeOffset?>("LastSyncAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTimeOffset?>("PairedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("PairedServerId")
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("SyncClientStates", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_SyncClientStates_LastPulledSequence", "LastPulledSequence >= 0");
+
+                            t.HasCheckConstraint("CK_SyncClientStates_Singleton", "Id = 1");
+                        });
+                });
+
+            modelBuilder.Entity("RetailLab.Data.SyncInboxReceipt", b =>
+                {
+                    b.Property<Guid>("OperationId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Outcome")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTimeOffset>("ProcessedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("RecordedResult")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("OperationId");
+
+                    b.ToTable("SyncInboxReceipts", (string)null);
+                });
+
+            modelBuilder.Entity("RetailLab.Data.SyncOutboxEntry", b =>
+                {
+                    b.Property<long>("LocalSequence")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long?>("BaseServerRevision")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Kind")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<Guid>("OperationId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Payload")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("PredecessorOperationId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("RecordedResult")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("State")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("LocalSequence");
+
+                    b.HasIndex("OperationId")
+                        .IsUnique();
+
+                    b.HasIndex("ProductId");
+
+                    b.HasIndex("State", "LocalSequence");
+
+                    b.ToTable("SyncOutboxEntries", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_SyncOutboxEntries_BaseServerRevision", "BaseServerRevision IS NULL OR BaseServerRevision >= 0");
                         });
                 });
 
