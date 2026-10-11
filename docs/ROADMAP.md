@@ -109,9 +109,33 @@ Desktop/server synchronization stays separate: 6D only coordinates multiple loca
 
 ## 7. Desktop and server synchronization
 
-Proposed outcome: selected offline changes synchronize safely when connectivity returns.
+### 7A. Synchronization boundaries and architecture
 
-Define ownership, stable identifiers, transport, retry behavior, and conflict policy only after the local and server workflows clarify the actual requirements.
+Status: implemented as `docs/SYNCHRONIZATION.md` (Tutorial 7A; design only, no behavior changes).
+
+Outcome: ownership, stable identity, pairing direction, outbox/inbox/cursor mechanics, the push-then-pull cycle, transaction boundaries, conflict policy, trust boundaries, and non-goals are documented and approved before implementation begins.
+
+### 7B. Stable identity, pairing metadata, contracts, schema foundations
+
+Status: implemented (Tutorial 7B; foundations only, no networking or sync behavior yet).
+
+Outcome: `Product` supports prescribed non-empty GUID identity for future bootstrap, plus an authoritative non-negative `ServerRevision` that operates independently from local `Version`. Core contains typed, transport-independent sync contracts for operations (`CreateProductOperation`, `UpdateProductDetailsOperation`, `ArchiveProductOperation`, `UnarchiveProductOperation`), causal chains (`BaseServerRevision` vs `PredecessorOperationId`), authoritative snapshots (`ProductSnapshot`), server change entries (`ServerChangeEntry`), and operation results (`SyncOperationResult`). Data provides persistence-only models and an additive EF Core migration (`SynchronizationFoundations`) introducing client pairing state, outbox, inbox receipts, and monotonic change-feed tables without touching existing records.
+
+### 7C. Read-only catalogue bootstrap and incremental pull (proposed)
+
+Outcome: pairing for new/empty databases with cursor-tracked downloads; no uploads yet.
+
+### 7D. Authenticated outbox upload for product management (proposed)
+
+Outcome: create/update/archive/unarchive upload with receipts; requires the staff-device authentication design first.
+
+### 7E. Inventory adjustment upload and checkout changes flowing back (proposed)
+
+Outcome: delta operations up; authoritative stock and the adjustment log down to desktop.
+
+Later: conflict-resolution UI, background scheduling, existing-database pairing/migration strategy, production hardening, and deployment decisions.
+
+Ownership, identity, transport, retry, and conflict policy are now defined at the design level in `docs/SYNCHRONIZATION.md`; each slice above implements one narrow piece.
 
 ## Working agreement
 

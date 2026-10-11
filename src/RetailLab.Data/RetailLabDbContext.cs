@@ -20,6 +20,14 @@ public sealed class RetailLabDbContext(DbContextOptions<RetailLabDbContext> opti
 
     public DbSet<InventoryAdjustment> InventoryAdjustments => Set<InventoryAdjustment>();
 
+    public DbSet<SyncClientState> SyncClientStates => Set<SyncClientState>();
+
+    public DbSet<SyncOutboxEntry> SyncOutboxEntries => Set<SyncOutboxEntry>();
+
+    public DbSet<SyncInboxReceipt> SyncInboxReceipts => Set<SyncInboxReceipt>();
+
+    public DbSet<SyncChangeFeedEntry> SyncChangeFeedEntries => Set<SyncChangeFeedEntry>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);

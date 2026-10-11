@@ -8,7 +8,7 @@ All projects target .NET 10 with nullable reference checking and implicit import
 
 | Location | Current responsibility |
 | --- | --- |
-| `src/RetailLab.Core` | Retail entities, validation, business workflows, customer catalogue lookups, and the persistence boundary. It has no EF Core or UI dependency. |
+| `src/RetailLab.Core` | Retail entities, validation, business workflows, customer catalogue lookups, typed transport-independent synchronization contracts, and the persistence boundary. It has no EF Core or UI dependency. |
 | `src/RetailLab.Data` | EF Core SQLite context, mappings, repository, migrations, and idempotent sample-data initialization. |
 | `src/RetailLab.LabCli` | Interactive Lab Prototype 1 console interface plus staff product and inventory workflow, and application startup. |
 | `src/RetailLab.Web` | Customer storefront (Razor Pages): home, catalogue, product details, Identity-backed accounts, per-customer favourites, a per-customer basket, and simulated basket checkout with order history over the same Core and Data layers. |
@@ -54,7 +54,7 @@ Product 1 --------< Bookmark
    +--------------< InventoryAdjustment
 ```
 
-- `Product` owns SKU (immutable), description, price, stock, archive state, and stock-mutation rules, plus a `Version` optimistic-concurrency token bumped by every successful mutation.
+- `Product` owns SKU (immutable), description, price, stock, archive state, stock-mutation rules, a database-local `Version` optimistic-concurrency token, a separate authoritative non-negative `ServerRevision`, and support for prescribed non-empty GUID construction alongside the default `Guid.NewGuid()`.
 - `Bookmark` joins the fixed simulated customer to a product.
 - `BasketItem` joins a customer to a product with a positive quantity, timestamps, and a `Version` optimistic-concurrency token.
 - `Order` owns its lines and calculates its total.
@@ -102,9 +102,9 @@ Every POST ends in Post-Redirect-Get: success redirects to `/Orders/{id}`, rule 
 
 ## Database
 
-`RetailLabDbContext` maps thirteen SQLite tables: six RetailLab business tables plus seven framework-managed Identity tables.
+`RetailLabDbContext` maps seventeen SQLite tables: six RetailLab business tables, seven framework-managed Identity tables, plus four synchronization persistence tables.
 
-- `Products`, with a case-insensitive unique SKU, nonnegative price and stock constraints, plus `IsArchived`, nullable `ArchivedAtUtc`, and `Version` as an optimistic-concurrency token.
+- `Products`, with a case-insensitive unique SKU, nonnegative price and stock constraints, plus `IsArchived`, nullable `ArchivedAtUtc`, `Version` as an optimistic-concurrency token, and `ServerRevision` with default 0.
 - `Bookmarks`, with `(CustomerIdentifier, ProductId)` as its composite primary key. Customer bookmark queries exclude archived products.
 - `BasketItems`, with `(CustomerIdentifier, ProductId)` as its composite primary key, a positive-quantity check constraint, and `Version` as an optimistic-concurrency token. Customer basket queries include products in one query with no archived filter.
 - `Orders`, indexed by customer identifier and placement time.
@@ -113,11 +113,25 @@ Every POST ends in Post-Redirect-Get: success redirects to `/Orders/{id}`, rule 
 
 - `AspNetUsers`, `AspNetRoles`, `AspNetUserClaims`, `AspNetRoleClaims`, `AspNetUserLogins`, `AspNetUserRoles`, and `AspNetUserTokens`: the standard framework-managed Identity schema. Business tables hold no credentials and no foreign keys to these tables.
 
-Migrations are stored in `RetailLab.Data/Migrations`. Application startup applies pending migrations, then inserts the fictional sample catalogue only if no products exist. It never recreates the database. Existing data survives the product-archive and adjustments migration unchanged; historic order-driven stock changes before Tutorial 2 have no adjustment rows. The product-version migration adds `Version` with a zero default for existing rows.
+- `SyncClientStates`, a singleton table (`Id = 1`) storing client device identity, paired server identifier, monotonic cursor (`LastPulledSequence`), pairing timestamp, and last successful sync timestamp.
+- `SyncOutboxEntries`, durable local operations ordered by database-generated monotonic `LocalSequence`, unique `OperationId`, indexed `ProductId`, operation kind, serialized payload, base revision or predecessor id, processing state, and recorded result.
+- `SyncInboxReceipts`, terminal server decision receipts keyed by `OperationId`, recording accepted/conflict/rejected outcome and result details for idempotent upload retries.
+- `SyncChangeFeedEntries`, authoritative server change entries sequenced by database-generated monotonic `Sequence`, indexed `ProductId`, change kind, product server revision, payload, and UTC timestamp.
+
+Migrations are stored in `RetailLab.Data/Migrations`. Application startup applies pending migrations, then inserts the fictional sample catalogue only if no products exist. It never recreates the database. Existing data survives migrations unchanged: `ProductArchiveAndAdjustments` preserved products, `ProductVersion` added `Version`, and `SynchronizationFoundations` added `ServerRevision` (default 0) and the four synchronization tables.
 
 The runtime database file (`retaillab.db` plus SQLite WAL/shared-memory sidecars) is local demonstration data and is git-ignored; it must never live inside the repository.
 
-SQLite cannot translate ordering by `DateTimeOffset`. Order and adjustment history are filtered in the database and sorted in memory after loading; this is acceptable for the deliberately small prototype. Persisted timestamps are UTC.
+SQLite cannot translate ordering by `DateTimeOffset`. Order, adjustment, and outbox history rely on explicit sequences or monotonic keys for deterministic ordering; persisted timestamps are UTC.
+
+## Synchronization foundations (Tutorial 7B)
+
+Tutorial 7B introduces the typed contracts and persistence schema needed for later desktop-to-server synchronization, without introducing network transport or UI changes:
+
+- **Identity & Revisions:** `Product` supports prescribed GUID identity (for future bootstrap imports) and keeps `Version` (local optimistic concurrency token) strictly separate from `ServerRevision` (authoritative server version). Normal mutations bump `Version` without altering `ServerRevision`. `ApplyServerRevision` allows applying authoritative server state while rejecting negative numbers and revisions that regress.
+- **Causal Chains:** Transport-independent Core contracts represent client operations (`CreateProductOperation`, `UpdateProductDetailsOperation`, `ArchiveProductOperation`, `UnarchiveProductOperation`). Creation carries neither base revision nor predecessor; mutating operations require exactly one of `BaseServerRevision` (based on server state) or `PredecessorOperationId` (chained behind unsent local operations).
+- **Snapshots & Change Feed:** `ProductSnapshot` captures authoritative product state at a specific server revision; `ServerChangeEntry` models ordered feed items; and `SyncOperationResult` models server evaluation outcomes (`Accepted`, `Conflict`, `Rejected`).
+- **Persistence Boundary:** Serialization payloads, singleton client state, outbox queues, inbox receipts, and change feed rows live strictly in `RetailLab.Data`. Core remains completely free of HTTP, JSON, EF Core, and SQLite dependencies.
 
 ## Runtime data flow
 
@@ -234,4 +248,4 @@ The database defaults to `%LOCALAPPDATA%\RetailLab\LabPrototype1\retaillab.db`. 
 
 ## Deferred architecture
 
-Desktop product creation/editing, staff authentication and roles, synchronization, search, pagination, deployment, and SaaS tenancy are not implemented yet. Shared models do not imply that future server and offline desktop applications will share one physical database file.
+Staff authentication and roles, synchronization, search, pagination, deployment, and SaaS tenancy are not implemented yet. The future database boundary is explicit: the website will use an authoritative server-side database while each desktop installation keeps its own offline SQLite database, coordinated by the push-then-pull protocol in `docs/SYNCHRONIZATION.md` — shared Core models never imply one shared physical file.
