@@ -244,7 +244,23 @@ Consequences:
 - Fresh seed products publish revision 1 with globally ordered feed sequences; existing server products are backfilled once without changing their GUIDs.
 - Failed saves restore speculative server revisions and detach derived entries before existing conflict translation runs.
 - The shared development key is coarse API access only; pairing identity and future staff-device authentication remain separate concepts.
-- 7C-i exposes server data but does not yet download it into Desktop or LabCli. The headless client remains parked as 7C-ii, and uploads remain 7D work.
+- The API is consumed by the headless 7C-ii LabCli client. Desktop integration and uploads remain later work.
+
+## D021 - Pair once and apply authoritative pull pages atomically in a dedicated client database
+
+Status: approved and implemented (Tutorial 7C-ii).
+
+Place HTTP and orchestration in a UI-independent `RetailLab.Sync` project that depends only on Core. Keep client persistence in Data behind `ILocalSyncStore`, using fresh base `RetailLabDbContext` instances so pulled snapshots can never publish server feed entries. LabCli composes these pieces through an explicit `sync --server <url> --data-directory <path>` command and reads the development key only from `RETAILLAB_SYNC_READ_KEY`.
+
+Pair only when the database has no products and no outbox entries, persist the server instance GUID once, and never silently repoint it. Begin downloads only when no pending outbox work exists. Validate contiguous feed sequences and next product revisions, then commit every page's projection changes and cursor in one transaction. A rejected or interrupted page leaves both projection and cursor unchanged.
+
+Reason: bootstrap is the smallest useful end-to-end client proof, but a partial page, accidental sample seeding, database repointing, or pull-over-local-work would make later bidirectional synchronization unsafe. Explicit one-shot execution keeps retry and background scheduling policy out of this slice.
+
+Consequences:
+- A client database migrates without sample seed data and can resume from its last committed cursor.
+- The first authoritative snapshot creates the product with its server GUID; later snapshots replace the projection only at the next revision and bump local `Version` once.
+- Authentication, server availability, server identity, cursor, gap, and malformed-response failures are reported separately and never trigger automatic retries.
+- WPF integration, outbox upload, device authentication, and existing-data adoption remain deferred.
 
 ## Open decisions
 

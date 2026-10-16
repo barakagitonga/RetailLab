@@ -234,6 +234,25 @@ Store staff can edit active-product details and archive or unarchive products wi
 
 From Windows, run `dotnet run --project src/RetailLab.Desktop`: edit an active product and confirm Desktop and the refreshed web catalogue show the change; verify SKU is read-only with no stock field; try blank and overlong descriptions plus nonnumeric and negative prices; confirm Edit is disabled for archived products. Start an archive, answer No, and confirm nothing changes; archive with Yes and confirm the row flips, Edit/Apply disable, History stays available, and the product leaves the catalogue while a pre-existing basket line turns removal-only. Unarchive and confirm editing returns with catalogue visibility. For the stale-form test, open Edit in Desktop, change the same product through the console in another terminal, then save the old form and confirm the conflict message, the preserved console change, and the refreshed values. For the stale-action test, archive through the console while Desktop shows the product active, then use the stale Desktop archive action and confirm the conflict with automatic refresh and no second mutation. Finish by confirming New Product, Refresh, Adjustment, and History still work. Set `RETAILLAB_DATA_DIRECTORY` before launch to share one database between interfaces or to use an isolated folder.
 
+## Tutorial 7C-ii: headless catalogue bootstrap and incremental pull
+
+Status: implemented through `RetailLab.LabCli`, `RetailLab.Sync`, and `RetailLab.Data`.
+
+The headless client can create a dedicated local SQLite catalogue projection from the Web server's authoritative feed and incrementally catch up on later runs.
+
+- The command requires an explicit server URL and client data directory; the read key comes from `RETAILLAB_SYNC_READ_KEY` and is never stored in source control.
+- A first run migrates the client schema without seeding sample products, pairs only an empty database, and pulls from sequence zero.
+- Later runs reuse the stored device/server identities and last committed cursor; they do not pair again.
+- Each page's product changes and cursor advance commit atomically. Cancellation or a rejected page leaves that entire page unapplied.
+- Pending local outbox work, a changed server identity, a cursor beyond the feed, a sequence gap, an invalid revision, or malformed server data stops safely.
+- The command reports pairing, applied sequence ranges, and the final product/cursor count. It does not retry automatically.
+
+Run Web with `RETAILLAB_SYNC_READ_KEY` configured, set the same environment variable in the client terminal, then run:
+
+```powershell
+dotnet run --project src/RetailLab.LabCli -- sync --server http://127.0.0.1:5197 --data-directory .\.tmp-sync-client
+```
+
 ## Scope boundaries
 
-Staff authentication and roles, client-side synchronization, uploads, synchronization UI, search, pagination, deployment, and SaaS tenancy are not implemented yet. Ordering is simulated end to end: the website and console share one ordering implementation with no payment processing. Simultaneous operations use optimistic concurrency rather than locking: checkout workflows may perform bounded retries, while staff-edit conflicts refresh current data and require deliberate review before the user retries. The synchronization architecture lives in `docs/SYNCHRONIZATION.md`; Tutorial 7C-i now gives Web an authoritative atomic change feed plus protected read-only pair/pull endpoints, but no Desktop or LabCli client consumes that feed yet. Interfaces therefore continue coordinating locally by sharing one database file until the parked 7C-ii client is implemented.
+Staff authentication and roles, synchronization uploads, Desktop synchronization UI, background sync, search, pagination, deployment, and SaaS tenancy are not implemented yet. Ordering is simulated end to end with no payment processing. Tutorial 7C-ii provides an explicit headless LabCli read-only client for a dedicated database; normal Web, interactive console, and Desktop workflows can still coordinate locally through one shared file. The synchronization architecture and remaining push-then-pull phases live in `docs/SYNCHRONIZATION.md`.

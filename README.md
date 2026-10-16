@@ -52,13 +52,18 @@ Browser / Console / WPF
                                                 SQLite (.db file)
 ```
 
+The first synchronization client adds a second path: `RetailLab.LabCli sync`
+uses `RetailLab.Sync` to read the Web feed and `RetailLab.Data` to apply each
+page plus its cursor atomically to a dedicated local SQLite database.
+
 ## Projects
 
 | Project | Role |
 | --- | --- |
 | `src/RetailLab.Core` | Business entities (`Product`, `Order`, `Bookmark`, `BasketItem`, `InventoryAdjustment`), validation, and services (`OrderService`, `CheckoutService`, `ProductService`, `InventoryService`, `BookmarkService`, `BasketService`, `CatalogService`). Has no dependency on UI frameworks or Entity Framework Core. |
 | `src/RetailLab.Data` | EF Core `DbContext`, entity mappings, the `EfRetailRepository` implementation, the standard Identity EF Core store (`AspNetUsers` and related framework tables), migrations, and idempotent seed data. |
-| `src/RetailLab.LabCli` | Console application hosting the persistent retail workflow and the staff product/inventory workflow. |
+| `src/RetailLab.Sync` | UI-independent HTTP transport and pull orchestration for pairing and incremental catalogue synchronization. |
+| `src/RetailLab.LabCli` | Console application hosting the persistent retail workflow, staff product/inventory workflow, and explicit headless synchronization command. |
 | `src/RetailLab.Web` | Razor Pages storefront: catalogue plus Identity-backed customer accounts, per-customer favourites, a per-customer basket, and simulated checkout with order history. PageModels call Core services and render web-only display models; markup never touches entities. |
 | `src/RetailLab.Desktop` | Windows WPF staff application: exact local inventory, audited stock adjustments, read-only adjustment-history viewing, product creation, explicit inventory refresh, detail editing, and archive controls. It coordinates existing Core services and keeps WPF display concerns outside the domain model. |
 | `tests/RetailLab.Tests` | xUnit suite: Core unit tests, Web display tests, and SQLite integration tests. |
@@ -80,6 +85,10 @@ dotnet run --project src/RetailLab.Web
 
 # Run the Windows staff application
 dotnet run --project src/RetailLab.Desktop
+
+# Bootstrap or update a dedicated headless client database
+$env:RETAILLAB_SYNC_READ_KEY = 'your-development-read-key'
+dotnet run --project src/RetailLab.LabCli -- sync --server http://127.0.0.1:5197 --data-directory .\.tmp-sync-client
 ```
 
 Local troubleshooting note: the current Windows installation of .NET SDK
@@ -97,16 +106,16 @@ The console, website, and desktop application use a local SQLite file. By defaul
 - Commerce is simulated: web and console checkout share one ordering implementation with no real payment processing.
 - No staff login yet: the console and desktop use fixed demo actor labels; only web customers have real accounts so far.
 - Desktop product management assumes one shared local database file; simultaneous changes from another interface resolve through friendly retry messages rather than locking.
-- No synchronization between installations yet. Web now publishes an authoritative product feed and exposes development-key-protected read-only pair/pull endpoints, but no Desktop or LabCli client consumes them yet (design lives in [docs/SYNCHRONIZATION.md](docs/SYNCHRONIZATION.md)).
+- Synchronization is read-only and headless so far: LabCli can bootstrap and incrementally update a new dedicated catalogue database, but Desktop integration, uploads, background retries, and production device authentication remain deferred (design lives in [docs/SYNCHRONIZATION.md](docs/SYNCHRONIZATION.md)).
 - SQLite is a development and offline-demonstration choice, not a multi-user server database.
 
 ## Roadmap
 
-Completed: persistent console retail flow, staff product and inventory management with audit history, the customer catalogue website, customer accounts with isolated favourites, a customer basket with simulated web checkout, the local WPF staff workflows, synchronization foundations, and server-side atomic feed publication with a read-only sync API. The next parked slice adds the first headless pull client. Details live in [docs/ROADMAP.md](docs/ROADMAP.md); decisions are logged in [docs/DECISIONS.md](docs/DECISIONS.md).
+Completed: persistent console retail flow, staff product and inventory management with audit history, the customer catalogue website, customer accounts with isolated favourites, a customer basket with simulated web checkout, the local WPF staff workflows, synchronization foundations, server-side atomic feed publication, and the first headless bootstrap/incremental pull client. The next synchronization slice is authenticated outbox upload. Details live in [docs/ROADMAP.md](docs/ROADMAP.md); decisions are logged in [docs/DECISIONS.md](docs/DECISIONS.md).
 
 ## Testing
 
-`dotnet test RetailLab.sln --no-build -m:1` — observed result: **189 tests, 0 failed** (Core unit tests, Web display and redirect-policy tests, and SQLite integration tests, including the shared local SQLite factory, migration, archive-visibility, audit-history, two-customer isolation, and standard Identity account coverage: hashing, sign-in, generic credential errors, and lockout; plus basket coverage: service rules, merge overflow, isolation, archived retention and removal, and deterministic persistence-conflict translation; plus checkout coverage: shared staging, current-price snapshots, isolation, idempotent duplicate submission, atomic rollback, final-unit and stale-data races, product-version conflicts, order display, and expected-version stale-form conflicts; plus synchronization coverage: identity and causal-chain contracts, migration preservation, pairing/outbox/inbox/feed persistence, atomic server feed publication, backfill and paging, and HTTP-level pair/pull authentication, validation, feed-gap rejection, and incremental reads).
+`dotnet test RetailLab.sln --no-build -m:1` — observed result: **207 tests, 0 failed**. Synchronization coverage now includes authoritative snapshot application, atomic client page/cursor rollback, pairing eligibility, pending-outbox blocking, pair-once orchestration, cursor-gap protection, strict JSON handling, and HTTP error mapping in addition to the server feed/API coverage.
 
 ## Screenshots
 

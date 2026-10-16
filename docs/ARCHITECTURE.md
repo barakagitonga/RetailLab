@@ -10,7 +10,8 @@ All projects target .NET 10 with nullable reference checking and implicit import
 | --- | --- |
 | `src/RetailLab.Core` | Retail entities, validation, business workflows, customer catalogue lookups, typed transport-independent synchronization contracts, and the persistence boundary. It has no EF Core or UI dependency. |
 | `src/RetailLab.Data` | EF Core SQLite context, mappings, repository, migrations, and idempotent sample-data initialization. |
-| `src/RetailLab.LabCli` | Interactive Lab Prototype 1 console interface plus staff product and inventory workflow, and application startup. |
+| `src/RetailLab.Sync` | UI-independent HTTP transport and orchestration for read-only catalogue bootstrap and incremental pull. |
+| `src/RetailLab.LabCli` | Interactive Lab Prototype 1 console interface plus staff product and inventory workflow, application startup, and the headless `sync` command. |
 | `src/RetailLab.Web` | Customer storefront (Razor Pages): home, catalogue, product details, Identity-backed accounts, per-customer favourites, a per-customer basket, and simulated basket checkout with order history over the same Core and Data layers. |
 | `src/RetailLab.Desktop` | Windows WPF staff interface: exact local inventory, one audited stock-adjustment workflow, read-only adjustment-history viewing, product creation, explicit inventory refresh, detail editing, and archive controls over Core and Data. |
 | `tests/RetailLab.Tests` | Core unit tests, Web display and redirect-policy tests, and SQLite integration tests (including standard Identity account flows, basket persistence conflicts, and checkout plus product-concurrency races). |
@@ -20,13 +21,14 @@ All projects target .NET 10 with nullable reference checking and implicit import
 ```text
 RetailLab.Core   -> no other projects
 RetailLab.Data   -> RetailLab.Core, EF Core SQLite
-RetailLab.LabCli -> RetailLab.Core, RetailLab.Data
+RetailLab.Sync   -> RetailLab.Core
+RetailLab.LabCli -> RetailLab.Core, RetailLab.Data, RetailLab.Sync
 RetailLab.Web    -> RetailLab.Core, RetailLab.Data
 RetailLab.Desktop-> RetailLab.Core, RetailLab.Data
-RetailLab.Tests  -> RetailLab.Core, RetailLab.Data, RetailLab.Web (for display-model tests only)
+RetailLab.Tests  -> RetailLab.Core, RetailLab.Data, RetailLab.Sync, RetailLab.Web
 ```
 
-Core therefore remains reusable by later Razor Pages and WPF interfaces without depending on those technologies or on EF Core. The test project references Web only so mapper and redirect-policy tests compile against web models; the reference points one way and production code is unaffected. Data references the `Microsoft.AspNetCore.Identity.EntityFrameworkCore` package for the standard Identity store.
+Core therefore remains reusable by later Razor Pages and WPF interfaces without depending on those technologies or on EF Core. The test project references Web for mapper/redirect-policy tests and Sync for client transport/orchestration tests; both references point from Tests to production projects. Data references the `Microsoft.AspNetCore.Identity.EntityFrameworkCore` package for the standard Identity store.
 
 ## Desktop layer
 
@@ -141,6 +143,14 @@ Tutorial 7B introduces the typed contracts and persistence schema needed for lat
 - **Stable identity:** `SyncServerProperties` stores one `ServerInstanceId`. Pairing returns that ID, current UTC time, and the feed head; the URL is not identity.
 - **Read boundary:** `ISyncFeedReader` converts persistence rows into Core `ServerChangeEntry` contracts. `GET /api/sync/v1/pull` pages by global sequence, reports the head and `hasMore`, rejects negative or beyond-head cursors, and rejects a mismatched server identity.
 - **Development trust boundary:** pair and pull require `RETAILLAB_SYNC_READ_KEY` through the `X-RetailLab-Sync-Key` header. The key is configuration-only and is never logged. This is not staff-device authentication, which remains required before uploads.
+
+## Headless bootstrap and incremental pull (Tutorial 7C-ii)
+
+- **Separated orchestration:** `RetailLab.Sync` depends only on Core. `HttpSyncTransport` owns HTTP, authentication headers, web JSON, timeouts, and server-error mapping; `SyncOrchestrator` owns pair-once and ordered paging policy.
+- **Local storage boundary:** `EfLocalSyncStore` in Data creates a fresh base `RetailLabDbContext` per operation. It never uses the publishing server context. A pulled page, product projections, and `LastPulledSequence` commit in one SQLite transaction or all roll back.
+- **Safe first pairing:** only a database with no products and no outbox rows may pair. The stable server GUID is stored once and is never silently replaced. Client startup migrates the schema but deliberately skips sample-data seeding.
+- **Conservative pull:** pending local outbox work blocks download; feed entries must be contiguous and product revisions must advance exactly once. Server identity changes, beyond-head cursors, malformed responses, and gaps stop without moving the cursor.
+- **Headless composition:** `RetailLab.LabCli sync` requires explicit `--server` and `--data-directory` values plus `RETAILLAB_SYNC_READ_KEY`. There are no automatic retries, uploads, background scheduling, or WPF integration in this slice.
 
 ## Runtime data flow
 
@@ -257,4 +267,4 @@ The database defaults to `%LOCALAPPDATA%\RetailLab\LabPrototype1\retaillab.db`. 
 
 ## Deferred architecture
 
-Staff authentication and roles, client-side synchronization, uploads, synchronization UI, search, catalogue pagination, deployment, and SaaS tenancy are not implemented yet. Web now publishes and serves an authoritative read-only feed, but no local application consumes it. The database boundary is explicit: the website uses an authoritative server-side database while each future synchronized desktop installation keeps its own offline SQLite database, coordinated by the push-then-pull protocol in `docs/SYNCHRONIZATION.md` — shared Core models never imply one shared physical file.
+Staff authentication and roles, uploads, Desktop synchronization UI, background scheduling, search, catalogue pagination, deployment, and SaaS tenancy are not implemented yet. Web publishes an authoritative read-only feed and the headless LabCli client can consume it into a dedicated SQLite projection. Desktop remains local-only until push-then-pull is safe. Shared Core models never imply one shared physical file.
