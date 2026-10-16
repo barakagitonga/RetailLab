@@ -123,15 +123,15 @@ Outcome: `Product` supports prescribed non-empty GUID identity for future bootst
 
 ### 7C-i. Server-side feed publication and read-only sync API
 
-Status: implemented (server half of Tutorial 7C; no client yet).
+Status: implemented (server half of Tutorial 7C).
 
 Outcome: Web uses a server-only EF Core context that advances per-product authoritative revisions and writes one atomic change-feed entry for every product mutation. Pre-7C server databases are backfilled exactly once, a persisted server instance ID distinguishes database identity from its URL, and development-key-protected `pair` and paged `pull` endpoints expose the ordered feed. There are still no desktop downloads, uploads, synchronization UI, or production device authentication.
 
-### 7C-ii. Headless catalogue bootstrap and incremental pull client (approved, parked)
+### 7C-ii. Headless catalogue bootstrap and incremental pull client
 
-Status: approved design; implementation waits for independent verification of 7C-i.
+Status: implemented.
 
-Outcome: a transport and orchestrator in a UI-independent `RetailLab.Sync` project will pair a new empty local database, apply pages and cursor updates transactionally, and resume interrupted pulls. LabCli will provide the first headless demonstration; WPF remains deferred until push-then-pull is safe.
+Outcome: a transport and orchestrator in the UI-independent `RetailLab.Sync` project pair a new empty local database, apply pages and cursor updates transactionally, and resume interrupted pulls. LabCli provides the first explicit headless demonstration. Pairing refuses nonempty databases, pending outbox work blocks pulls, and protocol/identity/cursor failures stop without advancing local state. WPF, uploads, background scheduling, and automatic retries remain deferred.
 
 ### 7D. Authenticated outbox upload for product management (proposed)
 

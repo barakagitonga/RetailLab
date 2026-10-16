@@ -21,6 +21,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\RetailLab.Core\RetailLab.Core.csproj" />
     <ProjectReference Include="..\..\src\RetailLab.Data\RetailLab.Data.csproj" />
+    <ProjectReference Include="..\..\src\RetailLab.Sync\RetailLab.Sync.csproj" />
     <!-- Needed so mapper/display-model tests compile against the Web project.
          The reference points one way (Tests -> Web); production code is unaffected. -->
     <ProjectReference Include="..\..\src\RetailLab.Web\RetailLab.Web.csproj" />

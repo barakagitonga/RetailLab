@@ -3,6 +3,7 @@
   <ItemGroup>
     <ProjectReference Include="..\RetailLab.Core\RetailLab.Core.csproj" />
     <ProjectReference Include="..\RetailLab.Data\RetailLab.Data.csproj" />
+    <ProjectReference Include="..\RetailLab.Sync\RetailLab.Sync.csproj" />
   </ItemGroup>
 
   <PropertyGroup>

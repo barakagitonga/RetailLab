@@ -1,8 +1,8 @@
 # RetailLab synchronization design (Tutorial 7A)
 
-Status: **approved design direction — not implemented.** Nothing in this
-document describes working behavior. Implementation arrives in narrow later
-slices (see the phased roadmap below).
+Status: **approved design direction, implemented through Tutorial 7C-ii.**
+Sections 7B, 7C-i, and 7C-ii now describe working foundations, server feed/API,
+and headless read-only client behavior. Uploads and later phases remain design.
 
 ## 1. Purpose and boundaries
 
@@ -19,24 +19,21 @@ It covers:
 - what is deliberately left undecided (deferred choices);
 - what the first sync slices will not attempt (non-goals).
 
-It does not choose a cloud provider, a transport library, a message broker,
-or any new package. It does not change any code. Later slices must stay
+It does not choose a cloud provider, a message broker, or a production
+deployment topology. Implementation slices must stay
 inside the architecture boundaries in `AGENTS.md`: Core must not depend on
-WPF, ASP.NET Core, EF Core, or SQLite, so sync *contracts* may live in Core
-but sync *transport and storage* belong in Data and the interface projects.
+WPF, ASP.NET Core, EF Core, or SQLite. Sync *contracts* live in Core,
+transport/orchestration in `RetailLab.Sync`, storage in Data, and executable
+composition in an interface project such as LabCli.
 
 ## 2. Current state versus target state
 
-**Current state (verified in the repository).** The website
-(`src/RetailLab.Web/Program.cs`), the console (`src/RetailLab.LabCli`), and
-the desktop application (`src/RetailLab.Desktop/App.xaml.cs`) all resolve the
-same default database file (`%LOCALAPPDATA%\RetailLab\LabPrototype1`) or one
-shared `RETAILLAB_DATA_DIRECTORY`. There is one physical SQLite database, one
-set of tables (business tables plus the Identity `AspNet*` tables), and five
-EF Core migrations. "Multi-interface" behavior today means several programs
-taking turns against the same file, coordinated by explicit desktop Refresh,
-expected-version checks (Tutorial 6D), and EF optimistic concurrency. That is
-deliberate local coordination — it is not offline synchronization.
+**Current state (verified in the repository).** The normal website, interactive
+console, and desktop modes can still deliberately share one local SQLite file
+through `RETAILLAB_DATA_DIRECTORY`. Separately, the 7C-ii LabCli `sync` command
+can create a dedicated client SQLite database, pair it once with Web, and pull
+the authoritative product feed incrementally. Desktop still uses local shared-
+file coordination; uploads and bidirectional synchronization do not exist yet.
 
 **Target state (approved direction).** The website uses an authoritative
 server-side database. Each desktop installation keeps its own local SQLite
@@ -419,8 +416,10 @@ Each slice stays narrow and independently verifiable:
   server-only atomic revision/feed publication, revision-zero backfill,
   persisted server identity, and development-key-protected pair/pull endpoints.
 - **7C-ii: headless catalogue bootstrap and incremental pull client** —
-  approved and parked until 7C-i is independently verified; it will pair only
-  new/empty sync-managed databases and apply cursor-tracked pages transactionally.
+  implemented: a Core-only transport/storage boundary, UI-independent HTTP
+  transport and orchestrator, empty-database pair-once gate, pending-outbox
+  block, atomic page/cursor application, strict protocol checks, and a LabCli
+  command using an explicit server and dedicated data directory.
 - **7D: authenticated desktop outbox upload for product management
   operations** — requires the staff-device authentication design from
   section 14; create/update/archive/unarchive upload with receipts.
@@ -446,7 +445,8 @@ dependency order, not marketing names.)
 - Upload transport shape and protocol version negotiation beyond the implemented
   versioned read-only `/api/sync/v1/pair` and `/api/sync/v1/pull` endpoints.
 - Retry policy details (attempt counts, waits, backoff).
-- Page sizes for pull and batch limits for push.
+- Batch limits for push. Pull currently defaults to 100 entries and permits an
+  explicit client page size from 1 through 500.
 - Existing-database pairing/migration strategy for divergent GUIDs.
 - Conflict-resolution UI beyond "needs attention" plus authoritative
   snapshot display.
