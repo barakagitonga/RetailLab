@@ -444,6 +444,9 @@ namespace RetailLab.Data.Migrations
 
                     b.HasIndex("ProductId");
 
+                    b.HasIndex("ProductId", "ServerRevision")
+                        .IsUnique();
+
                     b.ToTable("SyncChangeFeedEntries", null, t =>
                         {
                             t.HasCheckConstraint("CK_SyncChangeFeedEntries_ServerRevision", "ServerRevision >= 0");
@@ -546,6 +549,28 @@ namespace RetailLab.Data.Migrations
                     b.ToTable("SyncOutboxEntries", null, t =>
                         {
                             t.HasCheckConstraint("CK_SyncOutboxEntries_BaseServerRevision", "BaseServerRevision IS NULL OR BaseServerRevision >= 0");
+                        });
+                });
+
+            modelBuilder.Entity("RetailLab.Data.SyncServerProperties", b =>
+                {
+                    b.Property<int>("Id")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("ServerInstanceId")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ServerInstanceId")
+                        .IsUnique();
+
+                    b.ToTable("SyncServerProperties", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_SyncServerProperties_Singleton", "Id = 1");
                         });
                 });
 

@@ -20,6 +20,8 @@ internal sealed class SyncChangeFeedEntryConfiguration : IEntityTypeConfiguratio
 
         builder.Property(entry => entry.ProductId).IsRequired();
         builder.HasIndex(entry => entry.ProductId);
+        builder.HasIndex(entry => new { entry.ProductId, entry.ServerRevision })
+            .IsUnique();
 
         builder.Property(entry => entry.ChangeKind).IsRequired();
 

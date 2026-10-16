@@ -121,9 +121,17 @@ Status: implemented (Tutorial 7B; foundations only, no networking or sync behavi
 
 Outcome: `Product` supports prescribed non-empty GUID identity for future bootstrap, plus an authoritative non-negative `ServerRevision` that operates independently from local `Version`. Core contains typed, transport-independent sync contracts for operations (`CreateProductOperation`, `UpdateProductDetailsOperation`, `ArchiveProductOperation`, `UnarchiveProductOperation`), causal chains (`BaseServerRevision` vs `PredecessorOperationId`), authoritative snapshots (`ProductSnapshot`), server change entries (`ServerChangeEntry`), and operation results (`SyncOperationResult`). Data provides persistence-only models and an additive EF Core migration (`SynchronizationFoundations`) introducing client pairing state, outbox, inbox receipts, and monotonic change-feed tables without touching existing records.
 
-### 7C. Read-only catalogue bootstrap and incremental pull (proposed)
+### 7C-i. Server-side feed publication and read-only sync API
 
-Outcome: pairing for new/empty databases with cursor-tracked downloads; no uploads yet.
+Status: implemented (server half of Tutorial 7C; no client yet).
+
+Outcome: Web uses a server-only EF Core context that advances per-product authoritative revisions and writes one atomic change-feed entry for every product mutation. Pre-7C server databases are backfilled exactly once, a persisted server instance ID distinguishes database identity from its URL, and development-key-protected `pair` and paged `pull` endpoints expose the ordered feed. There are still no desktop downloads, uploads, synchronization UI, or production device authentication.
+
+### 7C-ii. Headless catalogue bootstrap and incremental pull client (approved, parked)
+
+Status: approved design; implementation waits for independent verification of 7C-i.
+
+Outcome: a transport and orchestrator in a UI-independent `RetailLab.Sync` project will pair a new empty local database, apply pages and cursor updates transactionally, and resume interrupted pulls. LabCli will provide the first headless demonstration; WPF remains deferred until push-then-pull is safe.
 
 ### 7D. Authenticated outbox upload for product management (proposed)
 

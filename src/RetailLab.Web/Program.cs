@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using RetailLab.Core;
 using RetailLab.Data;
 using RetailLab.Web.Services;
+using RetailLab.Web.Sync;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -34,8 +35,14 @@ var databaseDirectory = string.IsNullOrWhiteSpace(configuredDataDirectory)
 
 var database = new RetailLabSqliteDatabase(databaseDirectory);
 
-builder.Services.AddDbContext<RetailLabDbContext>(options => options.UseSqlite(database.ConnectionString));
+builder.Services.AddSingleton(database);
+builder.Services.AddSingleton<ServerBackfillService>();
+builder.Services.AddDbContext<ServerRetailDbContext>(
+    options => options.UseSqlite(database.ConnectionString));
+builder.Services.AddScoped<RetailLabDbContext>(
+    services => services.GetRequiredService<ServerRetailDbContext>());
 builder.Services.AddScoped<IRetailRepository, EfRetailRepository>();
+builder.Services.AddScoped<ISyncFeedReader, SyncFeedReader>();
 builder.Services.AddScoped<CatalogService>();
 builder.Services.AddScoped<BookmarkService>();
 builder.Services.AddScoped<BasketService>();
@@ -48,11 +55,18 @@ var app = builder.Build();
 
 try
 {
+    await using (var migrationContext = database.CreateDbContext())
+    {
+        await DatabaseInitializer.MigrateAsync(migrationContext);
+    }
+
     using (var scope = app.Services.CreateScope())
     {
-        var dbContext = scope.ServiceProvider.GetRequiredService<RetailLabDbContext>();
-        await DatabaseInitializer.InitializeAsync(dbContext);
+        var serverContext = scope.ServiceProvider.GetRequiredService<ServerRetailDbContext>();
+        await DatabaseInitializer.SeedIfEmptyAsync(serverContext);
     }
+
+    await app.Services.GetRequiredService<ServerBackfillService>().PrepareAsync();
 }
 catch (Exception exception)
 {
@@ -71,6 +85,7 @@ app.UseRouting();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapRazorPages();
+app.MapRetailLabSyncEndpoints();
 
 app.Run();
 return 0;

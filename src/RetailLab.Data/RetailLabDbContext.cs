@@ -5,9 +5,18 @@ using RetailLab.Core;
 
 namespace RetailLab.Data;
 
-public sealed class RetailLabDbContext(DbContextOptions<RetailLabDbContext> options)
-    : IdentityDbContext<IdentityUser>(options)
+public class RetailLabDbContext : IdentityDbContext<IdentityUser>
 {
+    public RetailLabDbContext(DbContextOptions<RetailLabDbContext> options)
+        : base(options)
+    {
+    }
+
+    protected RetailLabDbContext(DbContextOptions options)
+        : base(options)
+    {
+    }
+
     public DbSet<Product> Products => Set<Product>();
 
     public DbSet<Bookmark> Bookmarks => Set<Bookmark>();
@@ -27,6 +36,8 @@ public sealed class RetailLabDbContext(DbContextOptions<RetailLabDbContext> opti
     public DbSet<SyncInboxReceipt> SyncInboxReceipts => Set<SyncInboxReceipt>();
 
     public DbSet<SyncChangeFeedEntry> SyncChangeFeedEntries => Set<SyncChangeFeedEntry>();
+
+    public DbSet<SyncServerProperties> SyncServerProperties => Set<SyncServerProperties>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

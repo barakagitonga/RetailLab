@@ -485,3 +485,10 @@ $RECYCLE.BIN/
 retaillab.db
 retaillab.db-wal
 retaillab.db-shm
+
+# Local AI-assisted artifact generation and rendered previews.
+# Final files may be copied elsewhere when they are intentionally published,
+# but these working folders are not part of the RetailLab source tree.
+/.codex-build/
+/output/
+/tmp/

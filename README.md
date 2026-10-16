@@ -82,6 +82,12 @@ dotnet run --project src/RetailLab.Web
 dotnet run --project src/RetailLab.Desktop
 ```
 
+Local troubleshooting note: the current Windows installation of .NET SDK
+10.0.401 fails silently during parallel solution evaluation and can leave
+MSBuild worker processes running. Until that SDK installation is repaired,
+use `dotnet build RetailLab.sln -m:1` followed by
+`dotnet test RetailLab.sln --no-build -m:1` on this workstation.
+
 ## Demonstration database
 
 The console, website, and desktop application use a local SQLite file. By default it lives at `%LOCALAPPDATA%\RetailLab\LabPrototype1\retaillab.db`. Set the `RETAILLAB_DATA_DIRECTORY` environment variable to point the applications at the same folder to deliberately share one demonstration database, or at a fresh empty folder for an isolated run (the schema migrates and the sample catalogue seeds automatically on startup). Runtime database files are git-ignored and must never be committed.
@@ -91,16 +97,16 @@ The console, website, and desktop application use a local SQLite file. By defaul
 - Commerce is simulated: web and console checkout share one ordering implementation with no real payment processing.
 - No staff login yet: the console and desktop use fixed demo actor labels; only web customers have real accounts so far.
 - Desktop product management assumes one shared local database file; simultaneous changes from another interface resolve through friendly retry messages rather than locking.
-- No synchronization between installations yet; synchronization foundations (identity, contracts, schema) exist, but network synchronization behavior is still unavailable (design lives in [docs/SYNCHRONIZATION.md](docs/SYNCHRONIZATION.md)).
+- No synchronization between installations yet. Web now publishes an authoritative product feed and exposes development-key-protected read-only pair/pull endpoints, but no Desktop or LabCli client consumes them yet (design lives in [docs/SYNCHRONIZATION.md](docs/SYNCHRONIZATION.md)).
 - SQLite is a development and offline-demonstration choice, not a multi-user server database.
 
 ## Roadmap
 
-Completed: persistent console retail flow, staff product and inventory management with audit history, the customer catalogue website, customer accounts with isolated favourites, a customer basket with simulated web checkout, the first local WPF inventory-adjustment workflow, desktop adjustment-history viewing, desktop product creation with inventory refresh, desktop product editing with archive controls, and synchronization foundations (stable identity, pairing metadata, contracts, schema). Planned implementation slices follow it toward active desktop/server synchronization. Details live in [docs/ROADMAP.md](docs/ROADMAP.md); decisions are logged in [docs/DECISIONS.md](docs/DECISIONS.md).
+Completed: persistent console retail flow, staff product and inventory management with audit history, the customer catalogue website, customer accounts with isolated favourites, a customer basket with simulated web checkout, the local WPF staff workflows, synchronization foundations, and server-side atomic feed publication with a read-only sync API. The next parked slice adds the first headless pull client. Details live in [docs/ROADMAP.md](docs/ROADMAP.md); decisions are logged in [docs/DECISIONS.md](docs/DECISIONS.md).
 
 ## Testing
 
-`dotnet test RetailLab.sln` — observed result: **165 tests, 0 failed** (Core unit tests, Web display and redirect-policy tests, and SQLite integration tests, including the shared local SQLite factory, migration, archive-visibility, audit-history, two-customer isolation, and standard Identity account coverage: hashing, sign-in, generic credential errors, and lockout; plus basket coverage: service rules, merge overflow, isolation, archived retention and removal, and deterministic persistence-conflict translation; plus checkout coverage: shared staging, current-price snapshots, isolation, idempotent duplicate submission, atomic rollback, final-unit and stale-data races, product-version conflicts, order display, and expected-version stale-form conflicts; plus synchronization foundations: prescribed GUID identity, server revision independence, causal-chain contract rules, migration schema upgrade preservation, client pairing state persistence, outbox sequence monotonicity and operation-id uniqueness, inbox receipt idempotency, change-feed sequence monotonicity, and causal metadata persistence).
+`dotnet test RetailLab.sln --no-build -m:1` — observed result: **189 tests, 0 failed** (Core unit tests, Web display and redirect-policy tests, and SQLite integration tests, including the shared local SQLite factory, migration, archive-visibility, audit-history, two-customer isolation, and standard Identity account coverage: hashing, sign-in, generic credential errors, and lockout; plus basket coverage: service rules, merge overflow, isolation, archived retention and removal, and deterministic persistence-conflict translation; plus checkout coverage: shared staging, current-price snapshots, isolation, idempotent duplicate submission, atomic rollback, final-unit and stale-data races, product-version conflicts, order display, and expected-version stale-form conflicts; plus synchronization coverage: identity and causal-chain contracts, migration preservation, pairing/outbox/inbox/feed persistence, atomic server feed publication, backfill and paging, and HTTP-level pair/pull authentication, validation, feed-gap rejection, and incremental reads).
 
 ## Screenshots
 
