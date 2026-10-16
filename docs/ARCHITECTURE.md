@@ -102,7 +102,7 @@ Every POST ends in Post-Redirect-Get: success redirects to `/Orders/{id}`, rule 
 
 ## Database
 
-`RetailLabDbContext` maps seventeen SQLite tables: six RetailLab business tables, seven framework-managed Identity tables, plus four synchronization persistence tables.
+`RetailLabDbContext` maps eighteen SQLite tables: six RetailLab business tables, seven framework-managed Identity tables, plus five synchronization persistence tables.
 
 - `Products`, with a case-insensitive unique SKU, nonnegative price and stock constraints, plus `IsArchived`, nullable `ArchivedAtUtc`, `Version` as an optimistic-concurrency token, and `ServerRevision` with default 0.
 - `Bookmarks`, with `(CustomerIdentifier, ProductId)` as its composite primary key. Customer bookmark queries exclude archived products.
@@ -117,8 +117,9 @@ Every POST ends in Post-Redirect-Get: success redirects to `/Orders/{id}`, rule 
 - `SyncOutboxEntries`, durable local operations ordered by database-generated monotonic `LocalSequence`, unique `OperationId`, indexed `ProductId`, operation kind, serialized payload, base revision or predecessor id, processing state, and recorded result.
 - `SyncInboxReceipts`, terminal server decision receipts keyed by `OperationId`, recording accepted/conflict/rejected outcome and result details for idempotent upload retries.
 - `SyncChangeFeedEntries`, authoritative server change entries sequenced by database-generated monotonic `Sequence`, indexed `ProductId`, change kind, product server revision, payload, and UTC timestamp.
+- `SyncServerProperties`, a server-only singleton identity row whose GUID remains stable when a deployment URL or port changes.
 
-Migrations are stored in `RetailLab.Data/Migrations`. Application startup applies pending migrations, then inserts the fictional sample catalogue only if no products exist. It never recreates the database. Existing data survives migrations unchanged: `ProductArchiveAndAdjustments` preserved products, `ProductVersion` added `Version`, and `SynchronizationFoundations` added `ServerRevision` (default 0) and the four synchronization tables.
+Migrations are stored in `RetailLab.Data/Migrations`. Application startup applies pending migrations and never recreates the database. Web migrates through the base context, seeds through `ServerRetailDbContext` so fresh products publish, then backfills any revision-zero products and ensures the stable server identity before serving requests. Desktop and LabCli keep their existing base-context initialization. Existing data survives migrations unchanged: `ProductArchiveAndAdjustments` preserved products, `ProductVersion` added `Version`, `SynchronizationFoundations` added `ServerRevision` and four foundation tables, and `SyncServerIdentity` adds the server singleton plus the unique `(ProductId, ServerRevision)` feed invariant.
 
 The runtime database file (`retaillab.db` plus SQLite WAL/shared-memory sidecars) is local demonstration data and is git-ignored; it must never live inside the repository.
 
@@ -132,6 +133,14 @@ Tutorial 7B introduces the typed contracts and persistence schema needed for lat
 - **Causal Chains:** Transport-independent Core contracts represent client operations (`CreateProductOperation`, `UpdateProductDetailsOperation`, `ArchiveProductOperation`, `UnarchiveProductOperation`). Creation carries neither base revision nor predecessor; mutating operations require exactly one of `BaseServerRevision` (based on server state) or `PredecessorOperationId` (chained behind unsent local operations).
 - **Snapshots & Change Feed:** `ProductSnapshot` captures authoritative product state at a specific server revision; `ServerChangeEntry` models ordered feed items; and `SyncOperationResult` models server evaluation outcomes (`Accepted`, `Conflict`, `Rejected`).
 - **Persistence Boundary:** Serialization payloads, singleton client state, outbox queues, inbox receipts, and change feed rows live strictly in `RetailLab.Data`. Core remains completely free of HTTP, JSON, EF Core, and SQLite dependencies.
+
+## Server feed and read-only API (Tutorial 7C-i)
+
+- **Explicit server context:** only `ServerRetailDbContext` publishes. Its asynchronous save derives authoritative revisions and feed snapshots before one atomic EF Core save; its synchronous save path throws. A failed save restores the speculative revisions and detaches derived rows before rethrowing.
+- **Existing-database transition:** fresh Web seed data publishes normally. A base-context startup service backfills revision-zero products exactly once while preserving GUIDs; the database unique index prevents duplicate per-product revisions during racing startups.
+- **Stable identity:** `SyncServerProperties` stores one `ServerInstanceId`. Pairing returns that ID, current UTC time, and the feed head; the URL is not identity.
+- **Read boundary:** `ISyncFeedReader` converts persistence rows into Core `ServerChangeEntry` contracts. `GET /api/sync/v1/pull` pages by global sequence, reports the head and `hasMore`, rejects negative or beyond-head cursors, and rejects a mismatched server identity.
+- **Development trust boundary:** pair and pull require `RETAILLAB_SYNC_READ_KEY` through the `X-RetailLab-Sync-Key` header. The key is configuration-only and is never logged. This is not staff-device authentication, which remains required before uploads.
 
 ## Runtime data flow
 
@@ -248,4 +257,4 @@ The database defaults to `%LOCALAPPDATA%\RetailLab\LabPrototype1\retaillab.db`. 
 
 ## Deferred architecture
 
-Staff authentication and roles, synchronization, search, pagination, deployment, and SaaS tenancy are not implemented yet. The future database boundary is explicit: the website will use an authoritative server-side database while each desktop installation keeps its own offline SQLite database, coordinated by the push-then-pull protocol in `docs/SYNCHRONIZATION.md` — shared Core models never imply one shared physical file.
+Staff authentication and roles, client-side synchronization, uploads, synchronization UI, search, catalogue pagination, deployment, and SaaS tenancy are not implemented yet. Web now publishes and serves an authoritative read-only feed, but no local application consumes it. The database boundary is explicit: the website uses an authoritative server-side database while each future synchronized desktop installation keeps its own offline SQLite database, coordinated by the push-then-pull protocol in `docs/SYNCHRONIZATION.md` — shared Core models never imply one shared physical file.

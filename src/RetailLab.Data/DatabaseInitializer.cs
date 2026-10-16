@@ -9,7 +9,21 @@ public static class DatabaseInitializer
         RetailLabDbContext dbContext,
         CancellationToken cancellationToken = default)
     {
-        await dbContext.Database.MigrateAsync(cancellationToken);
+        await MigrateAsync(dbContext, cancellationToken);
+        await SeedIfEmptyAsync(dbContext, cancellationToken);
+    }
+
+    public static Task MigrateAsync(
+        RetailLabDbContext dbContext,
+        CancellationToken cancellationToken = default)
+    {
+        return dbContext.Database.MigrateAsync(cancellationToken);
+    }
+
+    public static async Task SeedIfEmptyAsync(
+        RetailLabDbContext dbContext,
+        CancellationToken cancellationToken = default)
+    {
 
         if (await dbContext.Products.AnyAsync(cancellationToken))
         {

@@ -6,7 +6,7 @@ slices (see the phased roadmap below).
 
 ## 1. Purpose and boundaries
 
-This document answers one question before any synchronization code exists:
+This document began by answering one question before synchronization code existed:
 when the desktop application keeps its own offline database and the website
 keeps an authoritative server database, how do the two stay consistent
 without losing data, applying one change twice, or silently overwriting
@@ -415,9 +415,12 @@ Each slice stays narrow and independently verifiable:
   `SyncClientState`, `SyncOutboxEntry`, `SyncInboxReceipt`, and
   `SyncChangeFeedEntry` persistence tables via `SynchronizationFoundations`
   migration.
-- **7C: read-only server-to-desktop catalogue bootstrap and incremental
-  pull** — pairing for new/empty databases, cursor-tracked downloads, no
-  uploads yet.
+- **7C-i: server-side feed publication and read-only API** — implemented:
+  server-only atomic revision/feed publication, revision-zero backfill,
+  persisted server identity, and development-key-protected pair/pull endpoints.
+- **7C-ii: headless catalogue bootstrap and incremental pull client** —
+  approved and parked until 7C-i is independently verified; it will pair only
+  new/empty sync-managed databases and apply cursor-tracked pages transactionally.
 - **7D: authenticated desktop outbox upload for product management
   operations** — requires the staff-device authentication design from
   section 14; create/update/archive/unarchive upload with receipts.
@@ -440,7 +443,8 @@ dependency order, not marketing names.)
 **Deferred (recorded honestly, decided later with evidence).**
 
 - Staff-device authentication mechanism, roles, enrollment, and rotation.
-- Transport shape (which HTTP endpoints or equivalent, payload versioning).
+- Upload transport shape and protocol version negotiation beyond the implemented
+  versioned read-only `/api/sync/v1/pair` and `/api/sync/v1/pull` endpoints.
 - Retry policy details (attempt counts, waits, backoff).
 - Page sizes for pull and batch limits for push.
 - Existing-database pairing/migration strategy for divergent GUIDs.

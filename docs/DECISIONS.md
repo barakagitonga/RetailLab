@@ -230,6 +230,22 @@ Consequences:
 - Existing databases upgrade smoothly without data loss or GUID rewriting.
 - No network transport, background sync, or UI changes exist yet.
 
+## D020 - Publish authoritative product changes through a server-only context and read-only API
+
+Status: approved and implemented (Tutorial 7C-i).
+
+Use a sealed `ServerRetailDbContext` only in Web. Its asynchronous save path advances each added or modified product's `ServerRevision` and derives one serialized snapshot entry in the same database transaction. Ordinary `RetailLabDbContext` instances used by Desktop and LabCli never publish or advance authoritative revisions. The synchronous server save path is rejected explicitly so publication cannot be bypassed.
+
+Run migrations through the base context, seed fresh server databases through the server context, and backfill revision-zero products through a base context. Enforce one feed entry per `(ProductId, ServerRevision)` and persist a singleton `ServerInstanceId` in the server database. Expose development-key-protected `POST /api/sync/v1/pair` and `GET /api/sync/v1/pull` endpoints through transport-independent Core envelopes and `ISyncFeedReader`.
+
+Reason: publication must be atomic, visible, and impossible in offline local contexts. A stable database identity prevents a changed URL from masquerading as a new server, while cursor validation prevents clients from silently skipping or rewinding authoritative changes.
+
+Consequences:
+- Fresh seed products publish revision 1 with globally ordered feed sequences; existing server products are backfilled once without changing their GUIDs.
+- Failed saves restore speculative server revisions and detach derived entries before existing conflict translation runs.
+- The shared development key is coarse API access only; pairing identity and future staff-device authentication remain separate concepts.
+- 7C-i exposes server data but does not yet download it into Desktop or LabCli. The headless client remains parked as 7C-ii, and uploads remain 7D work.
+
 ## Open decisions
 
 | Question | Resolve before |
@@ -238,6 +254,5 @@ Consequences:
 | Stock adjustment reason taxonomy (free text vs enum) and actor roles | Protected web workflows |
 | Staff permissions and roles (customer password sign-in is done) | Protected web workflows |
 | Production server database/storage choice | Synchronization hardening |
-| Synchronization transport/API shape and payload versioning | Synchronization implementation |
 | Existing-database pairing strategy for divergent GUIDs | Synchronization implementation |
 | Staff-device authentication mechanism, roles, and enrollment | Authenticated sync upload |

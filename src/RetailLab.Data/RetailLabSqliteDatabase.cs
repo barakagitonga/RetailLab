@@ -39,4 +39,13 @@ public sealed class RetailLabSqliteDatabase
 
         return new RetailLabDbContext(options);
     }
+
+    public ServerRetailDbContext CreateServerDbContext()
+    {
+        var options = new DbContextOptionsBuilder<ServerRetailDbContext>()
+            .UseSqlite(ConnectionString)
+            .Options;
+
+        return new ServerRetailDbContext(options);
+    }
 }
