@@ -11,6 +11,22 @@ public interface ILocalSyncStore
 
     Task<bool> HasPendingOutboxWorkAsync(CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<PendingSyncOperation>> GetPendingOperationsAsync(
+        int limit,
+        CancellationToken cancellationToken = default);
+
+    Task ApplyUploadResultsAsync(
+        IReadOnlyList<UploadOperationResult> results,
+        CancellationToken cancellationToken = default);
+
+    Task<ProductSyncState?> GetProductSyncStateAsync(
+        Guid productId,
+        CancellationToken cancellationToken = default);
+
+    Task CaptureOperationAsync(
+        ISyncProductOperation operation,
+        CancellationToken cancellationToken = default);
+
     Task MarkPairedAsync(
         Guid deviceId,
         Guid serverInstanceId,
@@ -26,3 +42,8 @@ public interface ILocalSyncStore
         DateTimeOffset syncedAtUtc,
         CancellationToken cancellationToken = default);
 }
+
+public sealed record ProductSyncState(
+    Guid ProductId,
+    long ServerRevision,
+    Guid? LatestPendingOperationId);

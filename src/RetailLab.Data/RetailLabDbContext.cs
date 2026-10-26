@@ -35,6 +35,8 @@ public class RetailLabDbContext : IdentityDbContext<IdentityUser>
 
     public DbSet<SyncInboxReceipt> SyncInboxReceipts => Set<SyncInboxReceipt>();
 
+    public DbSet<SyncDevice> SyncDevices => Set<SyncDevice>();
+
     public DbSet<SyncChangeFeedEntry> SyncChangeFeedEntries => Set<SyncChangeFeedEntry>();
 
     public DbSet<SyncServerProperties> SyncServerProperties => Set<SyncServerProperties>();

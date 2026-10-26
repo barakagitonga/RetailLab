@@ -49,6 +49,9 @@ builder.Services.AddScoped<BasketService>();
 builder.Services.AddScoped<OrderService>();
 builder.Services.AddScoped<CheckoutService>();
 builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddScoped<IPasswordHasher<SyncDevice>, PasswordHasher<SyncDevice>>();
+builder.Services.AddScoped<SyncDeviceCredentialService>();
+builder.Services.AddScoped<ServerSyncOperationProcessor>();
 builder.Services.AddSingleton<CatalogDisplayMapper>();
 
 var app = builder.Build();

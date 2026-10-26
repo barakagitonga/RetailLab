@@ -2,6 +2,7 @@ using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
+using Microsoft.AspNetCore.Identity;
 using RetailLab.Core;
 using RetailLab.Data;
 
@@ -238,6 +239,116 @@ public sealed class SyncPersistenceTests
             Assert.IsType<SqliteException>(ex.InnerException);
             Assert.Contains("UNIQUE constraint failed", ex.InnerException!.Message);
         }
+    }
+
+    [Fact]
+    public async Task SyncDeviceAndAttributedReceipt_PersistHistoricalAuditValues()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<RetailLabDbContext>()
+            .UseSqlite(connection)
+            .Options;
+
+        var deviceId = Guid.NewGuid();
+        var operationId = Guid.NewGuid();
+        var device = new SyncDevice(deviceId, "Till 1", "Amina", SyncDeviceRoles.Staff, Now);
+        var credentials = new SyncDeviceCredentialService(new PasswordHasher<SyncDevice>());
+        var secret = credentials.IssueNewSecret(device);
+        var hash = new string('a', 64);
+
+        await using (var context = new RetailLabDbContext(options))
+        {
+            await context.Database.MigrateAsync();
+            context.SyncDevices.Add(device);
+            context.SyncInboxReceipts.Add(new SyncInboxReceipt(
+                operationId,
+                SyncOperationOutcome.Accepted,
+                "{\"code\":null}",
+                Now.AddMinutes(1),
+                deviceId,
+                device.DisplayName,
+                device.StaffDisplayName,
+                device.Role,
+                hash,
+                resultServerRevision: 4,
+                resultSnapshot: "{\"serverRevision\":4}"));
+            await context.SaveChangesAsync();
+        }
+
+        await using var verification = new RetailLabDbContext(options);
+        var loadedDevice = await verification.SyncDevices.SingleAsync();
+        var loadedReceipt = await verification.SyncInboxReceipts.SingleAsync();
+        Assert.True(credentials.Verify(loadedDevice, secret));
+        Assert.NotEqual(secret, loadedDevice.KeyHash);
+        Assert.Equal(deviceId, loadedReceipt.DeviceId);
+        Assert.Equal("Till 1", loadedReceipt.DeviceDisplayName);
+        Assert.Equal("Amina", loadedReceipt.ActorDisplayName);
+        Assert.Equal(SyncDeviceRoles.Staff, loadedReceipt.DeviceRole);
+        Assert.Equal(hash, loadedReceipt.OperationHash);
+        Assert.Equal(4, loadedReceipt.ResultServerRevision);
+        Assert.Equal(Now.AddMinutes(1), loadedReceipt.ProcessedAtUtc);
+    }
+
+    [Fact]
+    public void SyncDeviceCredentialService_GeneratesAndVerifiesPrintOnceSecret()
+    {
+        var device = new SyncDevice(
+            Guid.NewGuid(),
+            "Stockroom tablet",
+            "Amina",
+            SyncDeviceRoles.Staff,
+            Now);
+        var credentials = new SyncDeviceCredentialService(new PasswordHasher<SyncDevice>());
+
+        var secret = credentials.IssueNewSecret(device);
+
+        Assert.Equal(43, secret.Length);
+        Assert.DoesNotContain("=", secret);
+        Assert.True(credentials.Verify(device, secret));
+        Assert.False(credentials.Verify(device, "incorrect-secret"));
+        Assert.NotEqual(secret, device.KeyHash);
+    }
+
+    [Fact]
+    public async Task AuthenticatedDesktopUploadMigration_PreservesLegacyReceiptWithNullAttribution()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<RetailLabDbContext>()
+            .UseSqlite(connection)
+            .Options;
+        var operationId = Guid.NewGuid();
+
+        await using (var legacyContext = new RetailLabDbContext(options))
+        {
+            var migrator = legacyContext.Database.GetService<IMigrator>();
+            await migrator.MigrateAsync("SyncServerIdentity");
+
+            await using var command = connection.CreateCommand();
+            command.CommandText = @"
+                INSERT INTO SyncInboxReceipts
+                    (OperationId, Outcome, RecordedResult, ProcessedAtUtc)
+                VALUES
+                    ($operationId, $outcome, 'legacy', $processedAtUtc);";
+            command.Parameters.AddWithValue("$operationId", operationId.ToString().ToUpperInvariant());
+            command.Parameters.AddWithValue("$outcome", (int)SyncOperationOutcome.Rejected);
+            command.Parameters.AddWithValue("$processedAtUtc", Now.ToString("O"));
+            await command.ExecuteNonQueryAsync();
+        }
+
+        await using (var upgradeContext = new RetailLabDbContext(options))
+        {
+            await upgradeContext.Database.MigrateAsync();
+        }
+
+        await using var verification = new RetailLabDbContext(options);
+        var receipt = await verification.SyncInboxReceipts.SingleAsync();
+        Assert.Equal(operationId, receipt.OperationId);
+        Assert.Equal("legacy", receipt.RecordedResult);
+        Assert.Null(receipt.DeviceId);
+        Assert.Null(receipt.OperationHash);
+        Assert.Equal(Now, receipt.ProcessedAtUtc);
     }
 
     [Fact]

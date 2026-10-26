@@ -24,6 +24,18 @@ public sealed class SyncAuthenticationException : SyncException
         : base("The server rejected the read key. Check RETAILLAB_SYNC_READ_KEY.") { }
 }
 
+public sealed class SyncDeviceAuthenticationException : SyncException
+{
+    public SyncDeviceAuthenticationException()
+        : base("The server rejected this device credential. Check RETAILLAB_SYNC_DEVICE_KEY and the enrolled device ID.") { }
+}
+
+public sealed class SyncDeviceAuthorizationException : SyncException
+{
+    public SyncDeviceAuthorizationException()
+        : base("The enrolled device is not authorized to upload staff operations.") { }
+}
+
 public sealed class SyncServerUnavailableException : SyncException
 {
     public SyncServerUnavailableException(Uri serverUrl, Exception innerException)

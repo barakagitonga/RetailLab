@@ -253,6 +253,53 @@ Run Web with `RETAILLAB_SYNC_READ_KEY` configured, set the same environment vari
 dotnet run --project src/RetailLab.LabCli -- sync --server http://127.0.0.1:5197 --data-directory .\.tmp-sync-client
 ```
 
+## Tutorial 7D: authenticated desktop outbox upload
+
+Status: implemented through the headless LabCli demonstration.
+
+Staff can capture product creation, detail updates, archive, and unarchive
+while the dedicated client is offline. Each visible local change and its
+outbox intention commit together. The next explicit sync authenticates the
+enrolled device, pushes operations before downloading, stores accepted,
+conflicted, or rejected decisions locally, then catches up through the server
+feed. Conflicts remain for human attention and are never silently merged.
+
+Device enrollment, key rotation, and revocation are operator commands. The key
+is printed once and kept in `RETAILLAB_SYNC_DEVICE_KEY`; the server stores only
+its password hash. This is a development security model, not production secret
+storage or personal staff login. Instructions are in
+`docs/DEVICE-ENROLLMENT.md`. WPF sync UI, background retries, and
+conflict-resolution screens remain later work.
+
+## Tutorial 7E: synchronized inventory adjustments
+
+Status: implemented through the headless LabCli demonstration.
+
+An enrolled offline device can capture a signed stock adjustment with an exact
+reason token (`restock`, `damage`, `shrinkage`, or `correction`) and upload it
+through the authenticated outbox. Positive restocks and negative
+damage/shrinkage changes are enforced; correction may use either sign.
+
+- Capture updates the local stock forecast and outbox together. Adjustment
+  history remains applied-only and receives no row while the claim is Pending.
+- The server applies the delta to its current stock even when the product
+  revision moved. It rejects archived/future-base operations and returns an
+  `insufficient_stock` conflict instead of allowing negative stock.
+- Acceptance writes the existing adjustment ledger and product feed atomically
+  with the receipt. Retries replay without applying the delta twice.
+- The client validates the server result before creating its local applied
+  history row, then pulls the authoritative stock snapshot. Conflict and
+  rejection leave no adjustment-history row.
+- The headless capture command is `adjust-stock --product-id <guid> --delta
+  <signed-quantity> --reason <token>` with the same explicit client data
+  directory used by the other offline commands.
+
 ## Scope boundaries
 
-Staff authentication and roles, synchronization uploads, Desktop synchronization UI, background sync, search, pagination, deployment, and SaaS tenancy are not implemented yet. Ordering is simulated end to end with no payment processing. Tutorial 7C-ii provides an explicit headless LabCli read-only client for a dedicated database; normal Web, interactive console, and Desktop workflows can still coordinate locally through one shared file. The synchronization architecture and remaining push-then-pull phases live in `docs/SYNCHRONIZATION.md`.
+Personal staff login, Desktop synchronization UI, background
+sync, search, pagination, deployment, and SaaS tenancy are not implemented yet.
+Ordering is simulated end to end with no payment processing. Tutorials 7D–7E
+provide an explicit headless authenticated push-then-pull client for a
+dedicated database; normal Web, interactive console, and Desktop workflows can
+still coordinate locally through one shared file. Remaining phases live in
+`docs/SYNCHRONIZATION.md`.

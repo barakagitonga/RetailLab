@@ -131,15 +131,32 @@ Outcome: Web uses a server-only EF Core context that advances per-product author
 
 Status: implemented.
 
-Outcome: a transport and orchestrator in the UI-independent `RetailLab.Sync` project pair a new empty local database, apply pages and cursor updates transactionally, and resume interrupted pulls. LabCli provides the first explicit headless demonstration. Pairing refuses nonempty databases, pending outbox work blocks pulls, and protocol/identity/cursor failures stop without advancing local state. WPF, uploads, background scheduling, and automatic retries remain deferred.
+Outcome: a transport and orchestrator in the UI-independent `RetailLab.Sync` project pair a new empty local database, apply pages and cursor updates transactionally, and resume interrupted pulls. LabCli provides the first explicit headless demonstration. Pairing refuses nonempty databases, pending outbox work blocks pulls, and protocol/identity/cursor failures stop without advancing local state. At this checkpoint uploads were deferred; 7D implements them, while WPF, background scheduling, and automatic retries remain deferred.
 
-### 7D. Authenticated outbox upload for product management (proposed)
+### 7D. Authenticated outbox upload for product management
 
-Outcome: create/update/archive/unarchive upload with receipts; requires the staff-device authentication design first.
+Status: implemented.
 
-### 7E. Inventory adjustment upload and checkout changes flowing back (proposed)
+Outcome: LabCli captures create/update/archive/unarchive changes and immutable
+causal outbox operations in one local transaction. Enrolled devices upload in
+bounded FIFO batches using a one-time-issued per-device credential; Web
+authenticates and authorizes the device, fingerprints the submitted draft, and
+records device-scoped terminal receipts. Accepted mutations publish revision
+and feed changes atomically, retries replay safely, and the orchestrator pulls
+only after Pending work is drained. WPF integration remains deferred; 7E
+implements inventory adjustments.
 
-Outcome: delta operations up; authoritative stock and the adjustment log down to desktop.
+### 7E. Inventory adjustment upload and checkout changes flowing back
+
+Status: implemented through the headless LabCli demonstration.
+
+Outcome: offline devices capture signed stock deltas with fixed reason tokens.
+The server rebases valid deltas over current stock, records accepted events in
+the existing adjustment ledger, and returns `insufficient_stock` conflicts
+without mutating stock. The client creates its applied-only ledger entry from
+a validated Accepted result and then pulls authoritative product snapshots,
+including stock changes caused by checkout. No new table or migration was
+needed. WPF sync presentation remains deferred.
 
 Later: conflict-resolution UI, background scheduling, existing-database pairing/migration strategy, production hardening, and deployment decisions.
 

@@ -8,5 +8,6 @@ public enum SyncOperationKind
     CreateProduct = 1,
     UpdateProductDetails = 2,
     ArchiveProduct = 3,
-    UnarchiveProduct = 4
+    UnarchiveProduct = 4,
+    AdjustStock = 5
 }

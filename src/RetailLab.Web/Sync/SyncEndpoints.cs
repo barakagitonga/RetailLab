@@ -16,6 +16,9 @@ public static class SyncEndpoints
         endpoints.MapGet("/api/sync/v1/pull", PullAsync)
             .AddEndpointFilter<RequireSyncKeyFilter>();
 
+        endpoints.MapPost("/api/sync/v1/upload", UploadEndpoint.HandleAsync)
+            .AddEndpointFilter<RequireDeviceCredentialFilter>();
+
         return endpoints;
     }
 
@@ -111,5 +114,4 @@ public static class SyncEndpoints
         return Results.Ok(response);
     }
 
-    private sealed record SyncApiError(string Code, string Message, long? HeadSequence = null);
 }

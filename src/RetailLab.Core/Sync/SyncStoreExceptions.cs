@@ -36,6 +36,11 @@ public sealed class SyncLocalStateException : Exception
         : base(message)
     {
     }
+
+    public SyncLocalStateException(string message, Exception innerException)
+        : base(message, innerException)
+    {
+    }
 }
 
 public sealed class SyncEligibilityException : Exception

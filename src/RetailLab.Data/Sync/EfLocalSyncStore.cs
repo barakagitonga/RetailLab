@@ -37,6 +37,279 @@ public sealed class EfLocalSyncStore(Func<RetailLabDbContext> createDbContext) :
             .AnyAsync(entry => entry.State == OutboxProcessingState.Pending, cancellationToken);
     }
 
+    public async Task<IReadOnlyList<PendingSyncOperation>> GetPendingOperationsAsync(
+        int limit,
+        CancellationToken cancellationToken = default)
+    {
+        if (limit <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(limit));
+        }
+
+        await using var dbContext = createDbContext();
+        var entries = await dbContext.SyncOutboxEntries
+            .AsNoTracking()
+            .Where(entry => entry.State == OutboxProcessingState.Pending)
+            .OrderBy(entry => entry.LocalSequence)
+            .Take(limit)
+            .ToListAsync(cancellationToken);
+        return entries
+            .Select(entry => new PendingSyncOperation(
+                entry.LocalSequence,
+                SyncOperationSerializer.Deserialize(entry)))
+            .ToList();
+    }
+
+    public async Task ApplyUploadResultsAsync(
+        IReadOnlyList<UploadOperationResult> results,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(results);
+        if (results.Count == 0)
+        {
+            throw new ArgumentException("At least one upload result is required.", nameof(results));
+        }
+
+        var duplicate = results
+            .GroupBy(result => result.OperationId)
+            .FirstOrDefault(group => group.Count() > 1);
+        if (duplicate is not null)
+        {
+            throw new SyncLocalStateException(
+                $"The upload response repeats operation {duplicate.Key:D}.");
+        }
+
+        await using var dbContext = createDbContext();
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+        var resultById = results.ToDictionary(result => result.OperationId);
+        var entries = await dbContext.SyncOutboxEntries
+            .Where(entry => resultById.Keys.Contains(entry.OperationId))
+            .OrderBy(entry => entry.LocalSequence)
+            .ToListAsync(cancellationToken);
+
+        if (entries.Count != results.Count || entries.Any(entry => entry.State != OutboxProcessingState.Pending))
+        {
+            throw new SyncLocalStateException(
+                "The upload response does not match the currently pending outbox entries.");
+        }
+
+        foreach (var entry in entries)
+        {
+            var result = resultById[entry.OperationId];
+            var recordedResult = System.Text.Json.JsonSerializer.Serialize(result);
+            switch (result.Outcome)
+            {
+                case SyncOperationOutcome.Accepted:
+                    if (entry.Kind == SyncOperationKind.AdjustStock)
+                    {
+                        await ApplyAcceptedAdjustmentAsync(
+                            dbContext,
+                            entry,
+                            result,
+                            cancellationToken);
+                    }
+                    entry.MarkProcessed(recordedResult);
+                    break;
+                case SyncOperationOutcome.Conflict:
+                    entry.MarkConflicted(recordedResult);
+                    break;
+                case SyncOperationOutcome.Rejected:
+                    entry.MarkRejected(recordedResult);
+                    break;
+                default:
+                    throw new SyncLocalStateException("The upload response contains an unknown outcome.");
+            }
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+    }
+
+    public async Task<ProductSyncState?> GetProductSyncStateAsync(
+        Guid productId,
+        CancellationToken cancellationToken = default)
+    {
+        if (productId == Guid.Empty)
+        {
+            throw new ArgumentException("Product ID cannot be empty.", nameof(productId));
+        }
+
+        await using var dbContext = createDbContext();
+        var revision = await dbContext.Products
+            .AsNoTracking()
+            .Where(product => product.Id == productId)
+            .Select(product => (long?)product.ServerRevision)
+            .SingleOrDefaultAsync(cancellationToken);
+        if (!revision.HasValue)
+        {
+            return null;
+        }
+
+        var predecessor = await dbContext.SyncOutboxEntries
+            .AsNoTracking()
+            .Where(entry =>
+                entry.ProductId == productId &&
+                entry.State == OutboxProcessingState.Pending)
+            .OrderByDescending(entry => entry.LocalSequence)
+            .Select(entry => (Guid?)entry.OperationId)
+            .FirstOrDefaultAsync(cancellationToken);
+        return new ProductSyncState(productId, revision.Value, predecessor);
+    }
+
+    public async Task CaptureOperationAsync(
+        ISyncProductOperation operation,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(operation);
+        await using var dbContext = createDbContext();
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+        var state = await dbContext.SyncClientStates
+            .AsNoTracking()
+            .SingleOrDefaultAsync(item => item.Id == SyncClientState.SingletonId, cancellationToken);
+        if (state is null || string.IsNullOrWhiteSpace(state.PairedServerId))
+        {
+            throw new SyncLocalStateException(
+                "This database must complete its first synchronization before offline edits are captured.");
+        }
+
+        Product product;
+        if (operation is CreateProductOperation create)
+        {
+            if (await dbContext.Products.AnyAsync(item => item.Id == create.ProductId, cancellationToken))
+            {
+                throw new SyncLocalStateException("The locally generated product ID is already in use.");
+            }
+            product = new Product(
+                create.ProductId,
+                create.Sku,
+                create.Description,
+                create.Price,
+                create.InitialStockQuantity);
+            dbContext.Products.Add(product);
+        }
+        else
+        {
+            product = await dbContext.Products.SingleOrDefaultAsync(
+                item => item.Id == operation.ProductId,
+                cancellationToken)
+                ?? throw new BusinessRuleException(
+                    $"Product {operation.ProductId:D} was not found locally.");
+            await ValidateCausalStateAsync(dbContext, product, (ICausalOperation)operation, cancellationToken);
+            switch (operation)
+            {
+                case UpdateProductDetailsOperation update:
+                    product.UpdateDetails(update.Description, update.Price);
+                    break;
+                case ArchiveProductOperation:
+                    product.Archive(operation.CreatedAtUtc);
+                    break;
+                case UnarchiveProductOperation:
+                    product.Unarchive();
+                    break;
+                case AdjustStockOperation adjustment:
+                    if (product.IsArchived)
+                    {
+                        throw new BusinessRuleException(
+                            $"Archived product {product.Sku} cannot be adjusted.");
+                    }
+                    product.AdjustStock(adjustment.Delta);
+                    break;
+                default:
+                    throw new SyncLocalStateException("The operation kind cannot be captured locally.");
+            }
+        }
+
+        var causal = operation as ICausalOperation;
+        dbContext.SyncOutboxEntries.Add(new SyncOutboxEntry(
+            operation.OperationId,
+            operation.ProductId,
+            operation.Kind,
+            SyncOperationSerializer.SerializePayload(operation),
+            causal?.BaseServerRevision,
+            causal?.PredecessorOperationId,
+            operation.CreatedAtUtc));
+        await dbContext.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+    }
+
+    private static async Task ApplyAcceptedAdjustmentAsync(
+        RetailLabDbContext dbContext,
+        SyncOutboxEntry entry,
+        UploadOperationResult result,
+        CancellationToken cancellationToken)
+    {
+        var operation = SyncOperationSerializer.Deserialize(entry) as AdjustStockOperation
+            ?? throw new SyncLocalStateException(
+                $"Outbox operation {entry.OperationId:D} is not a stock adjustment.");
+        var snapshot = result.Snapshot
+            ?? throw new SyncLocalStateException(
+                $"Accepted stock adjustment {entry.OperationId:D} has no validated snapshot.");
+        var state = await dbContext.SyncClientStates
+            .AsNoTracking()
+            .SingleOrDefaultAsync(item => item.Id == SyncClientState.SingletonId, cancellationToken)
+            ?? throw new SyncLocalStateException("The paired client checkpoint is missing.");
+        var actorIdentifier = $"sync-device:{state.DeviceId:D}";
+        var existing = await dbContext.InventoryAdjustments
+            .AsNoTracking()
+            .SingleOrDefaultAsync(item => item.Id == operation.OperationId, cancellationToken);
+
+        if (existing is not null)
+        {
+            var exactMatch =
+                existing.ProductId == operation.ProductId &&
+                existing.QuantityChange == operation.Delta &&
+                existing.ResultingQuantity == snapshot.StockQuantity &&
+                existing.Reason == operation.Reason &&
+                existing.ActorIdentifier == actorIdentifier &&
+                existing.CreatedAtUtc == operation.CreatedAtUtc;
+            if (!exactMatch)
+            {
+                throw new SyncLocalStateException(
+                    $"Inventory adjustment {operation.OperationId:D} conflicts with the pending operation.");
+            }
+
+            return;
+        }
+
+        var product = await dbContext.Products.SingleOrDefaultAsync(
+            item => item.Id == operation.ProductId,
+            cancellationToken)
+            ?? throw new SyncLocalStateException(
+                $"Product {operation.ProductId:D} is missing while its accepted adjustment is applied.");
+        dbContext.InventoryAdjustments.Add(new InventoryAdjustment(
+            operation.OperationId,
+            product,
+            operation.Delta,
+            snapshot.StockQuantity,
+            operation.Reason,
+            actorIdentifier,
+            operation.CreatedAtUtc));
+    }
+
+    private static async Task ValidateCausalStateAsync(
+        RetailLabDbContext dbContext,
+        Product product,
+        ICausalOperation operation,
+        CancellationToken cancellationToken)
+    {
+        var latestPending = await dbContext.SyncOutboxEntries
+            .AsNoTracking()
+            .Where(entry =>
+                entry.ProductId == product.Id &&
+                entry.State == OutboxProcessingState.Pending)
+            .OrderByDescending(entry => entry.LocalSequence)
+            .Select(entry => (Guid?)entry.OperationId)
+            .FirstOrDefaultAsync(cancellationToken);
+        var matches = latestPending.HasValue
+            ? operation.PredecessorOperationId == latestPending && !operation.BaseServerRevision.HasValue
+            : operation.BaseServerRevision == product.ServerRevision && !operation.PredecessorOperationId.HasValue;
+        if (!matches)
+        {
+            throw new SyncCheckpointConflictException(
+                "The product's pending-operation chain changed before the offline edit could be saved.");
+        }
+    }
+
     public async Task MarkPairedAsync(
         Guid deviceId,
         Guid serverInstanceId,

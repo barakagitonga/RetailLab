@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Data.Sqlite;
 using RetailLab.Core;
 using RetailLab.Data;
+using RetailLab.Sync;
 
 namespace RetailLab.Tests.Sync;
 
@@ -109,6 +110,292 @@ public sealed class EfLocalSyncStoreTests
         Assert.Equal(1, exception.ProductCount);
         await using var verification = database.Database.CreateDbContext();
         Assert.Equal("LOCAL-1", (await verification.Products.SingleAsync()).Sku);
+    }
+
+    [Fact]
+    public async Task OfflineCapture_ChainsOperationsAndUploadResultsBecomeTerminalAtomically()
+    {
+        await using var database = await TestClientDatabase.CreateAsync();
+        var store = new EfLocalSyncStore(database.Database.CreateDbContext);
+        await store.MarkPairedAsync(Guid.NewGuid(), Guid.NewGuid(), Now);
+        var service = new OfflineProductOperationService(store, new TestTimeProvider(Now));
+
+        var create = await service.CreateAsync("LOCAL-1", "First version", 10m, 2);
+        var update = await service.UpdateAsync(create.ProductId, "Second version", 12m);
+
+        var pending = await store.GetPendingOperationsAsync(limit: 25);
+        Assert.Equal(2, pending.Count);
+        Assert.Equal(create.OperationId, pending[0].Operation.OperationId);
+        var chainedUpdate = Assert.IsType<UpdateProductDetailsOperation>(pending[1].Operation);
+        Assert.Equal(create.OperationId, chainedUpdate.PredecessorOperationId);
+        Assert.Null(chainedUpdate.BaseServerRevision);
+
+        await store.ApplyUploadResultsAsync(
+        [
+            new UploadOperationResult(
+                create.OperationId,
+                SyncOperationOutcome.Accepted,
+                null,
+                1,
+                null,
+                false),
+            new UploadOperationResult(
+                update.OperationId,
+                SyncOperationOutcome.Accepted,
+                null,
+                2,
+                null,
+                false)
+        ]);
+
+        await using var verification = database.Database.CreateDbContext();
+        var product = await verification.Products.SingleAsync();
+        Assert.Equal("Second version", product.Description);
+        // The accepted revision arrives through the authoritative feed. Advancing
+        // it here would make the client's own revision-1 feed entry look stale.
+        Assert.Equal(0, product.ServerRevision);
+        Assert.All(
+            await verification.SyncOutboxEntries.OrderBy(entry => entry.LocalSequence).ToListAsync(),
+            entry => Assert.Equal(OutboxProcessingState.Processed, entry.State));
+    }
+
+    [Fact]
+    public async Task AdjustStockCapture_MutatesProjectionAndOutboxWithoutCreatingLedgerRow()
+    {
+        await using var database = await TestClientDatabase.CreateAsync();
+        var store = new EfLocalSyncStore(database.Database.CreateDbContext);
+        await store.MarkPairedAsync(Guid.NewGuid(), Guid.NewGuid(), Now);
+        var productId = Guid.NewGuid();
+        await store.ApplyPageAsync(
+            [ProductServerSnapshotTests.CreateEntry(1, productId, 1, stock: 5)],
+            expectedCursor: 0);
+        var service = new OfflineProductOperationService(store, new TestTimeProvider(Now));
+
+        var operation = await service.AdjustStockAsync(
+            productId,
+            3,
+            SynchronizedAdjustmentReasons.Restock);
+
+        await using var verification = database.Database.CreateDbContext();
+        Assert.Equal(8, (await verification.Products.SingleAsync()).StockQuantity);
+        Assert.Empty(await verification.InventoryAdjustments.ToListAsync());
+        var entry = await verification.SyncOutboxEntries.SingleAsync();
+        Assert.Equal(operation.OperationId, entry.OperationId);
+        Assert.Equal(SyncOperationKind.AdjustStock, entry.Kind);
+        var roundTripped = Assert.IsType<AdjustStockOperation>(SyncOperationSerializer.Deserialize(entry));
+        Assert.Equal(3, roundTripped.Delta);
+        Assert.Equal(SynchronizedAdjustmentReasons.Restock, roundTripped.Reason);
+    }
+
+    [Fact]
+    public async Task AdjustStockCapture_ArchivedProductWritesNeitherMutationNorOutbox()
+    {
+        await using var database = await TestClientDatabase.CreateAsync();
+        var store = new EfLocalSyncStore(database.Database.CreateDbContext);
+        await store.MarkPairedAsync(Guid.NewGuid(), Guid.NewGuid(), Now);
+        var productId = Guid.NewGuid();
+        await store.ApplyPageAsync(
+            [ProductServerSnapshotTests.CreateEntry(
+                1,
+                productId,
+                1,
+                stock: 5,
+                isArchived: true,
+                archivedAtUtc: Now)],
+            expectedCursor: 0);
+        var service = new OfflineProductOperationService(store, new TestTimeProvider(Now));
+
+        await Assert.ThrowsAsync<BusinessRuleException>(() => service.AdjustStockAsync(
+            productId,
+            2,
+            SynchronizedAdjustmentReasons.Restock));
+
+        await using var verification = database.Database.CreateDbContext();
+        Assert.Equal(5, (await verification.Products.SingleAsync()).StockQuantity);
+        Assert.Empty(await verification.SyncOutboxEntries.ToListAsync());
+        Assert.Empty(await verification.InventoryAdjustments.ToListAsync());
+    }
+
+    [Fact]
+    public async Task AcceptedAdjustment_CreatesPrescribedLedgerRowAndProcessesOutboxAtomically()
+    {
+        await using var database = await TestClientDatabase.CreateAsync();
+        var store = new EfLocalSyncStore(database.Database.CreateDbContext);
+        var deviceId = Guid.NewGuid();
+        await store.MarkPairedAsync(deviceId, Guid.NewGuid(), Now);
+        var productId = Guid.NewGuid();
+        await store.ApplyPageAsync(
+            [ProductServerSnapshotTests.CreateEntry(1, productId, 1, stock: 5)],
+            expectedCursor: 0);
+        var service = new OfflineProductOperationService(store, new TestTimeProvider(Now));
+        var operation = await service.AdjustStockAsync(
+            productId,
+            3,
+            SynchronizedAdjustmentReasons.Restock);
+        var snapshot = new ProductSnapshot(
+            productId,
+            "SERVER-1",
+            "Server product",
+            10m,
+            11,
+            false,
+            null,
+            2);
+
+        await store.ApplyUploadResultsAsync(
+        [
+            new UploadOperationResult(
+                operation.OperationId,
+                SyncOperationOutcome.Accepted,
+                null,
+                2,
+                snapshot,
+                false)
+        ]);
+
+        await using var verification = database.Database.CreateDbContext();
+        var adjustment = await verification.InventoryAdjustments.SingleAsync();
+        Assert.Equal(operation.OperationId, adjustment.Id);
+        Assert.Equal(3, adjustment.QuantityChange);
+        Assert.Equal(11, adjustment.ResultingQuantity);
+        Assert.Equal($"sync-device:{deviceId:D}", adjustment.ActorIdentifier);
+        Assert.Equal(Now, adjustment.CreatedAtUtc);
+        Assert.Equal(
+            OutboxProcessingState.Processed,
+            (await verification.SyncOutboxEntries.SingleAsync()).State);
+    }
+
+    [Theory]
+    [InlineData(SyncOperationOutcome.Conflict, "insufficient_stock")]
+    [InlineData(SyncOperationOutcome.Rejected, "product_archived")]
+    public async Task NonAcceptedAdjustment_CreatesNoLedgerRow(
+        SyncOperationOutcome outcome,
+        string code)
+    {
+        await using var database = await TestClientDatabase.CreateAsync();
+        var store = new EfLocalSyncStore(database.Database.CreateDbContext);
+        await store.MarkPairedAsync(Guid.NewGuid(), Guid.NewGuid(), Now);
+        var productId = Guid.NewGuid();
+        await store.ApplyPageAsync(
+            [ProductServerSnapshotTests.CreateEntry(1, productId, 1, stock: 5)],
+            expectedCursor: 0);
+        var service = new OfflineProductOperationService(store, new TestTimeProvider(Now));
+        var operation = await service.AdjustStockAsync(
+            productId,
+            -2,
+            SynchronizedAdjustmentReasons.Damage);
+
+        await store.ApplyUploadResultsAsync(
+        [
+            new UploadOperationResult(operation.OperationId, outcome, code, null, null, false)
+        ]);
+
+        await using var verification = database.Database.CreateDbContext();
+        Assert.Empty(await verification.InventoryAdjustments.ToListAsync());
+        var expectedState = outcome == SyncOperationOutcome.Conflict
+            ? OutboxProcessingState.Conflicted
+            : OutboxProcessingState.Rejected;
+        Assert.Equal(expectedState, (await verification.SyncOutboxEntries.SingleAsync()).State);
+    }
+
+    [Fact]
+    public async Task AcceptedAdjustment_WithExactExistingLedgerRow_CompletesDefensiveRecovery()
+    {
+        await using var database = await TestClientDatabase.CreateAsync();
+        var store = new EfLocalSyncStore(database.Database.CreateDbContext);
+        var deviceId = Guid.NewGuid();
+        await store.MarkPairedAsync(deviceId, Guid.NewGuid(), Now);
+        var productId = Guid.NewGuid();
+        await store.ApplyPageAsync(
+            [ProductServerSnapshotTests.CreateEntry(1, productId, 1, stock: 5)],
+            expectedCursor: 0);
+        var service = new OfflineProductOperationService(store, new TestTimeProvider(Now));
+        var operation = await service.AdjustStockAsync(
+            productId,
+            2,
+            SynchronizedAdjustmentReasons.Restock);
+        await using (var setup = database.Database.CreateDbContext())
+        {
+            var product = await setup.Products.SingleAsync();
+            setup.InventoryAdjustments.Add(new InventoryAdjustment(
+                operation.OperationId,
+                product,
+                operation.Delta,
+                9,
+                operation.Reason,
+                $"sync-device:{deviceId:D}",
+                operation.CreatedAtUtc));
+            await setup.SaveChangesAsync();
+        }
+        var snapshot = new ProductSnapshot(
+            productId, "SERVER-2", "Product", 10m, 9, false, null, 2);
+
+        await store.ApplyUploadResultsAsync(
+        [
+            new UploadOperationResult(
+                operation.OperationId,
+                SyncOperationOutcome.Accepted,
+                null,
+                2,
+                snapshot,
+                false)
+        ]);
+
+        await using var verification = database.Database.CreateDbContext();
+        Assert.Equal(1, await verification.InventoryAdjustments.CountAsync());
+        Assert.Equal(
+            OutboxProcessingState.Processed,
+            (await verification.SyncOutboxEntries.SingleAsync()).State);
+    }
+
+    [Fact]
+    public async Task AcceptedAdjustment_WithMismatchedExistingLedgerRow_RollsBackAndLeavesPending()
+    {
+        await using var database = await TestClientDatabase.CreateAsync();
+        var store = new EfLocalSyncStore(database.Database.CreateDbContext);
+        var deviceId = Guid.NewGuid();
+        await store.MarkPairedAsync(deviceId, Guid.NewGuid(), Now);
+        var productId = Guid.NewGuid();
+        await store.ApplyPageAsync(
+            [ProductServerSnapshotTests.CreateEntry(1, productId, 1, stock: 5)],
+            expectedCursor: 0);
+        var service = new OfflineProductOperationService(store, new TestTimeProvider(Now));
+        var operation = await service.AdjustStockAsync(
+            productId,
+            2,
+            SynchronizedAdjustmentReasons.Restock);
+        await using (var setup = database.Database.CreateDbContext())
+        {
+            var product = await setup.Products.SingleAsync();
+            setup.InventoryAdjustments.Add(new InventoryAdjustment(
+                operation.OperationId,
+                product,
+                operation.Delta,
+                8,
+                operation.Reason,
+                $"sync-device:{deviceId:D}",
+                operation.CreatedAtUtc));
+            await setup.SaveChangesAsync();
+        }
+        var snapshot = new ProductSnapshot(
+            productId, "SERVER-3", "Product", 10m, 9, false, null, 2);
+
+        await Assert.ThrowsAsync<SyncLocalStateException>(() => store.ApplyUploadResultsAsync(
+        [
+            new UploadOperationResult(
+                operation.OperationId,
+                SyncOperationOutcome.Accepted,
+                null,
+                2,
+                snapshot,
+                false)
+        ]));
+
+        await using var verification = database.Database.CreateDbContext();
+        Assert.Equal(8, (await verification.InventoryAdjustments.SingleAsync()).ResultingQuantity);
+        Assert.Equal(
+            OutboxProcessingState.Pending,
+            (await verification.SyncOutboxEntries.SingleAsync()).State);
     }
 
     private sealed class TestClientDatabase : IAsyncDisposable

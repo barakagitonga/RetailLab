@@ -484,10 +484,78 @@ namespace RetailLab.Data.Migrations
                         });
                 });
 
+            modelBuilder.Entity("RetailLab.Data.SyncDevice", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("KeyHash")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTimeOffset?>("LastSeenAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTimeOffset?>("RevokedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Role")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("StaffDisplayName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("SyncDevices", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_SyncDevices_Role", "Role = 'staff'");
+
+                            t.HasCheckConstraint("CK_SyncDevices_Status", "Status IN ('Active', 'Revoked')");
+                        });
+                });
+
             modelBuilder.Entity("RetailLab.Data.SyncInboxReceipt", b =>
                 {
                     b.Property<Guid>("OperationId")
                         .HasColumnType("TEXT");
+
+                    b.Property<string>("ActorDisplayName")
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("DeviceDisplayName")
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("DeviceId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("DeviceRole")
+                        .HasMaxLength(50)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("OperationHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT")
+                        .IsFixedLength();
 
                     b.Property<int>("Outcome")
                         .HasColumnType("INTEGER");
@@ -498,7 +566,15 @@ namespace RetailLab.Data.Migrations
                     b.Property<string>("RecordedResult")
                         .HasColumnType("TEXT");
 
+                    b.Property<long?>("ResultServerRevision")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("ResultSnapshot")
+                        .HasColumnType("TEXT");
+
                     b.HasKey("OperationId");
+
+                    b.HasIndex("DeviceId", "ProcessedAtUtc");
 
                     b.ToTable("SyncInboxReceipts", (string)null);
                 });
@@ -671,6 +747,14 @@ namespace RetailLab.Data.Migrations
                         .HasForeignKey("ProductId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("RetailLab.Data.SyncInboxReceipt", b =>
+                {
+                    b.HasOne("RetailLab.Data.SyncDevice", null)
+                        .WithMany()
+                        .HasForeignKey("DeviceId")
+                        .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("RetailLab.Core.Order", b =>

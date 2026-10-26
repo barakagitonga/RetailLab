@@ -139,6 +139,71 @@ public sealed class SyncOperationContractTests
             opId, prodId, baseServerRevision: null, predecessorOperationId: Guid.Empty, Now));
     }
 
+    [Theory]
+    [InlineData(5, SynchronizedAdjustmentReasons.Restock)]
+    [InlineData(-2, SynchronizedAdjustmentReasons.Damage)]
+    [InlineData(-1, SynchronizedAdjustmentReasons.Shrinkage)]
+    [InlineData(3, SynchronizedAdjustmentReasons.Correction)]
+    [InlineData(-3, SynchronizedAdjustmentReasons.Correction)]
+    public void AdjustStockOperation_AcceptsSupportedReasonAndSignCombinations(
+        int delta,
+        string reason)
+    {
+        var operationId = Guid.NewGuid();
+        var productId = Guid.NewGuid();
+
+        var operation = AdjustStockOperation.BasedOnServer(
+            operationId,
+            productId,
+            delta,
+            reason,
+            baseServerRevision: 7,
+            createdAtUtc: Now);
+
+        Assert.Equal(operationId, operation.OperationId);
+        Assert.Equal(productId, operation.ProductId);
+        Assert.Equal(SyncOperationKind.AdjustStock, operation.Kind);
+        Assert.Equal(delta, operation.Delta);
+        Assert.Equal(reason, operation.Reason);
+        Assert.Equal(7, operation.BaseServerRevision);
+        Assert.Null(operation.PredecessorOperationId);
+    }
+
+    [Theory]
+    [InlineData(0, SynchronizedAdjustmentReasons.Correction)]
+    [InlineData(-1, SynchronizedAdjustmentReasons.Restock)]
+    [InlineData(1, SynchronizedAdjustmentReasons.Damage)]
+    [InlineData(1, SynchronizedAdjustmentReasons.Shrinkage)]
+    [InlineData(1, "Restock")]
+    [InlineData(1, "other")]
+    public void AdjustStockOperation_RejectsInvalidDeltaReasonOrSign(int delta, string reason)
+    {
+        Assert.Throws<BusinessRuleException>(() => AdjustStockOperation.BasedOnServer(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            delta,
+            reason,
+            baseServerRevision: 1,
+            createdAtUtc: Now));
+    }
+
+    [Fact]
+    public void AdjustStockOperation_Chained_AcceptsPredecessorId()
+    {
+        var predecessorId = Guid.NewGuid();
+
+        var operation = AdjustStockOperation.Chained(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            -2,
+            SynchronizedAdjustmentReasons.Correction,
+            predecessorId,
+            Now);
+
+        Assert.Null(operation.BaseServerRevision);
+        Assert.Equal(predecessorId, operation.PredecessorOperationId);
+    }
+
     [Fact]
     public void ProductSnapshot_CapturesAndPreservesProductState()
     {
@@ -199,5 +264,51 @@ public sealed class SyncOperationContractTests
         Assert.Equal(opId, reject.OperationId);
         Assert.Equal(SyncOperationOutcome.Rejected, reject.Outcome);
         Assert.Equal("Invalid SKU format", reject.Message);
+    }
+
+    [Fact]
+    public void UploadContracts_KeepOneOperationIdentityAndValidateTerminalResults()
+    {
+        var deviceId = Guid.NewGuid();
+        var serverId = Guid.NewGuid();
+        var operation = new CreateProductOperation(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            "UPLOAD-01",
+            "Upload contract",
+            12.50m,
+            3,
+            Now);
+
+        var request = new UploadRequest(deviceId, serverId, [operation]);
+        var result = new UploadOperationResult(
+            operation.OperationId,
+            SyncOperationOutcome.Accepted,
+            code: null,
+            resultingServerRevision: 1,
+            snapshot: null,
+            replay: false);
+        var response = new UploadResponse(
+            SyncProtocolVersions.Upload,
+            serverId,
+            Now,
+            [result]);
+
+        Assert.Same(operation, request.Operations.Single());
+        Assert.Equal(operation.OperationId, response.Results.Single().OperationId);
+        Assert.Throws<ArgumentException>(() => new UploadOperationResult(
+            operation.OperationId,
+            SyncOperationOutcome.Accepted,
+            code: null,
+            resultingServerRevision: null,
+            snapshot: null,
+            replay: false));
+        Assert.Throws<ArgumentException>(() => new UploadOperationResult(
+            operation.OperationId,
+            SyncOperationOutcome.Rejected,
+            code: null,
+            resultingServerRevision: null,
+            snapshot: null,
+            replay: false));
     }
 }

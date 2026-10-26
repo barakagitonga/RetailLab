@@ -6,6 +6,16 @@ if (args.Length > 0 && args[0].Equals("sync", StringComparison.OrdinalIgnoreCase
     return await SyncCommand.RunAsync(args[1..]);
 }
 
+if (args.Length > 0 && args[0] is "enroll-device" or "rotate-device" or "revoke-device")
+{
+    return await DeviceCommand.RunAsync(args[0], args[1..]);
+}
+
+if (args.Length > 0 && args[0] is "create-product" or "update-product" or "archive-product" or "unarchive-product" or "adjust-stock")
+{
+    return await OfflineProductCommand.RunAsync(args[0], args[1..]);
+}
+
 try
 {
     var configuredDataDirectory = Environment.GetEnvironmentVariable("RETAILLAB_DATA_DIRECTORY");

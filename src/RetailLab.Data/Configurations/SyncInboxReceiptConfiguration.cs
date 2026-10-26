@@ -20,5 +20,23 @@ internal sealed class SyncInboxReceiptConfiguration : IEntityTypeConfiguration<S
 
         builder.Property(receipt => receipt.ProcessedAtUtc)
             .IsRequired();
+
+        builder.Property(receipt => receipt.DeviceDisplayName)
+            .HasMaxLength(SyncDevice.MaximumDisplayNameLength);
+        builder.Property(receipt => receipt.ActorDisplayName)
+            .HasMaxLength(SyncDevice.MaximumStaffDisplayNameLength);
+        builder.Property(receipt => receipt.DeviceRole)
+            .HasMaxLength(SyncDevice.MaximumRoleLength);
+        builder.Property(receipt => receipt.OperationHash)
+            .HasMaxLength(64)
+            .IsFixedLength();
+        builder.Property(receipt => receipt.ResultServerRevision);
+        builder.Property(receipt => receipt.ResultSnapshot);
+
+        builder.HasIndex(receipt => new { receipt.DeviceId, receipt.ProcessedAtUtc });
+        builder.HasOne<SyncDevice>()
+            .WithMany()
+            .HasForeignKey(receipt => receipt.DeviceId)
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }

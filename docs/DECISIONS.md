@@ -260,15 +260,80 @@ Consequences:
 - A client database migrates without sample seed data and can resume from its last committed cursor.
 - The first authoritative snapshot creates the product with its server GUID; later snapshots replace the projection only at the next revision and bump local `Version` once.
 - Authentication, server availability, server identity, cursor, gap, and malformed-response failures are reported separately and never trigger automatic retries.
-- WPF integration, outbox upload, device authentication, and existing-data adoption remain deferred.
+- At the end of 7C-ii, WPF integration, outbox upload, device authentication,
+  and existing-data adoption were deferred; 7D later implemented the middle
+  two for the headless client, while WPF and existing-data adoption remain deferred.
+
+## D022 - Per-device bearer credentials for state-changing synchronization
+
+Status: approved and implemented (Tutorial 7D).
+
+Bind each client-generated device ID through an explicit operator enrollment
+command. Issue 256 random bits as Base64Url text, print the secret once, and
+store only an ASP.NET Core Identity `PasswordHasher<SyncDevice>` hash. Uploads
+present only the device ID/key headers; the shared read key is not a second
+factor. Authorize the single `staff` device role and snapshot the server-owned
+device label, staff audit label, and role onto receipts.
+
+Unknown, wrong, and revoked credentials return the same 401 code. Response
+timing can still differ; dummy-hash equalization is deferred and not claimed.
+The development client reads the secret from `RETAILLAB_SYNC_DEVICE_KEY`;
+production OS credential storage, HTTPS enforcement, and rate limiting remain
+hardening work. Rotation is event-driven, and revoked device rows are retained.
+
+## D023 - Version-one upload protocol with device-scoped receipts
+
+Status: approved and implemented (Tutorial 7D).
+
+Web owns the upload JSON draft and computes a canonical SHA-256 fingerprint
+before Core construction. The format has fixed field order, length prefixes,
+and explicit missing/null/value states. Core remains free of JSON/HTTP; Data
+owns private outbox serialization; Sync maps Core operations to wire JSON and
+does not reference Data or calculate fingerprints.
+
+Receipts are scoped by originating device and fingerprint. Identical retries
+replay; altered payloads, other devices, and unattributed legacy receipts fail
+closed. Each operation has one transaction; accepted decisions atomically
+commit mutation, revision, feed, and receipt. Archive concurrency is checked
+before state validity. Client batches stop at 25, server caps are 100 operations
+and 256 KB, causal predecessors may cross batches, transient failures expose
+no actionable partial result, and the client pushes before pulling. The seven
+new nullable receipt columns preserve old rows while every new 7D receipt is
+fully attributed. Devices and receipts are retained indefinitely in this slice.
+
+## D024 - Synchronize inventory as applied, auditable delta events
+
+Status: approved and implemented (Tutorial 7E).
+
+Synchronized stock changes are signed deltas, not absolute quantities. The
+four exact operation reasons are `restock`, `damage`, `shrinkage`, and
+`correction`; their sign rules belong to Core and do not reinterpret existing
+free-text history or checkout's `Simulated order` entries. A moved revision is
+rebased for this operation only because deltas commute; a future base is
+rejected, and a below-zero result conflicts as `insufficient_stock`.
+
+The existing `InventoryAdjustments` table remains the business ledger and
+contains applied events only. Local capture writes the optimistic product plus
+outbox claim. Server acceptance atomically writes product, ledger, revision,
+feed, and receipt. A validated Accepted client result atomically promotes the
+claim into a local ledger row whose ID is the operation ID; an exact existing
+row supports defensive recovery, while any field mismatch stops loudly.
+Conflict and rejection create no ledger row, and feed application never
+creates one. Local synchronized rows use `sync-device:<DeviceId>`; server rows
+use the authenticated device's server-owned staff audit label.
+
+Adjustment receipts keep the ordinary replayable result fields plus
+stage-aware audit metadata. Existing four-kind `7d-fp-v1` fingerprints and
+recorded result shapes stay unchanged; only `adjustStock` uses `7e-fp-v1`.
+The client validates Accepted and `insufficient_stock` snapshots before any
+local write, requiring the matching active product and a positive revision.
+Protocol version remains 1 and no schema migration is required.
 
 ## Open decisions
 
 | Question | Resolve before |
 | --- | --- |
 | Permanent retailer brand and multi-currency support (Tutorial 3 uses temporary name RetailLab and USD-at-edge) | Storefront hardening |
-| Stock adjustment reason taxonomy (free text vs enum) and actor roles | Protected web workflows |
 | Staff permissions and roles (customer password sign-in is done) | Protected web workflows |
 | Production server database/storage choice | Synchronization hardening |
 | Existing-database pairing strategy for divergent GUIDs | Synchronization implementation |
-| Staff-device authentication mechanism, roles, and enrollment | Authenticated sync upload |

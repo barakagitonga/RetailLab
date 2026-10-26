@@ -152,6 +152,58 @@ Tutorial 7B introduces the typed contracts and persistence schema needed for lat
 - **Conservative pull:** pending local outbox work blocks download; feed entries must be contiguous and product revisions must advance exactly once. Server identity changes, beyond-head cursors, malformed responses, and gaps stop without moving the cursor.
 - **Headless composition:** `RetailLab.LabCli sync` requires explicit `--server` and `--data-directory` values plus `RETAILLAB_SYNC_READ_KEY`. There are no automatic retries, uploads, background scheduling, or WPF integration in this slice.
 
+## Tutorial 7D authenticated upload boundary
+
+`SyncDevices` is server-only authentication infrastructure. It binds the
+client-generated ID to one hashed device key, the `staff` role, status, and
+server-owned audit labels. The additive receipt migration adds nullable device
+attribution, fingerprint, result revision, and result snapshot fields so old
+rows survive; new upload receipts populate them fully. The optional device
+relationship restricts deletion because audit history is retained.
+
+The upload has three deliberately separate representations:
+
+```text
+Data-private outbox JSON
+    -> Core operation (no HTTP or JSON knowledge)
+    -> Sync-owned request JSON
+    -> Web-owned wire draft and canonical fingerprint
+    -> Core operation and authoritative server processing
+```
+
+`RetailLab.Sync` coordinates FIFO batches and push-then-pull while referencing
+only Core. `RetailLab.Data` reconstructs operations and atomically captures
+each offline local mutation with its outbox entry. Web authenticates headers,
+parses and fingerprints before Core construction, and processes each operation
+in its own transaction with the server context so revision and feed publication
+cannot separate from an accepted receipt.
+
+## Tutorial 7E synchronized inventory adjustments
+
+The fifth operation, `AdjustStockOperation`, carries a signed delta and one of
+four Core-owned reason tokens: `restock`, `damage`, `shrinkage`, or
+`correction`. Capture atomically changes the local product projection and adds
+the immutable outbox claim; it deliberately does not create a business ledger
+row yet. After the orchestrator validates an Accepted response, Data creates
+that local `InventoryAdjustment` using the operation ID and authoritative
+resulting stock in the same transaction that marks the outbox Processed.
+
+On the server, an adjustment delta may rebase over a moved product revision.
+A future base is rejected, an archived product is rejected, and a delta that
+would make current stock negative conflicts as `insufficient_stock`. An
+Accepted decision atomically changes the product, appends the existing
+`InventoryAdjustment` ledger row, advances the server revision, publishes the
+Updated feed snapshot, and stores the receipt. Conflict and rejection write a
+receipt only. No table or column was added for 7E.
+
+```text
+offline capture -> optimistic product + outbox claim
+upload -> authenticate -> fingerprint -> replay or decision
+accepted -> product + ledger + revision/feed + receipt
+client result -> validate -> Processed + local ledger
+pull -> authoritative product projection + cursor only
+```
+
 ## Runtime data flow
 
 Console:
@@ -267,4 +319,4 @@ The database defaults to `%LOCALAPPDATA%\RetailLab\LabPrototype1\retaillab.db`. 
 
 ## Deferred architecture
 
-Staff authentication and roles, uploads, Desktop synchronization UI, background scheduling, search, catalogue pagination, deployment, and SaaS tenancy are not implemented yet. Web publishes an authoritative read-only feed and the headless LabCli client can consume it into a dedicated SQLite projection. Desktop remains local-only until push-then-pull is safe. Shared Core models never imply one shared physical file.
+General staff authentication and permissions, Desktop synchronization UI, background scheduling, search, catalogue pagination, deployment, and SaaS tenancy are not implemented yet. Web publishes an authoritative feed, while the headless LabCli client can authenticate as an enrolled development device, upload product and inventory-adjustment operations, and pull authoritative state into a dedicated SQLite projection. Desktop remains local-only until this tested push-then-pull workflow is integrated into its UI. Shared Core models never imply one shared physical file.

@@ -62,7 +62,8 @@ public static class SyncCommand
             var transport = new HttpSyncTransport(
                 httpClient,
                 clientOptions,
-                readKey);
+                readKey,
+                Environment.GetEnvironmentVariable(HttpSyncTransport.DeviceKeyEnvironmentVariable));
             var store = new EfLocalSyncStore(database.CreateDbContext);
             var orchestrator = new SyncOrchestrator(
                 transport,
@@ -91,6 +92,15 @@ public static class SyncCommand
                     $"Products: {productCount}.");
             }
 
+
+            Console.WriteLine($"Device ID: {(await store.GetCheckpointAsync(cancellationSource.Token))!.DeviceId:D}");
+            if (result.OperationsUploaded > 0)
+            {
+                Console.WriteLine(
+                    $"Uploaded {result.OperationsUploaded} local operation(s) in " +
+                    $"{result.UploadBatches} batch(es).");
+            }
+
             return SuccessExitCode;
         }
         catch (OperationCanceledException) when (cancellationSource.IsCancellationRequested)
@@ -103,6 +113,14 @@ public static class SyncCommand
             return WriteFailure(exception.Message, ConfigurationExitCode);
         }
         catch (SyncAuthenticationException exception)
+        {
+            return WriteFailure(exception.Message, ConfigurationExitCode);
+        }
+        catch (SyncDeviceAuthenticationException exception)
+        {
+            return WriteFailure(exception.Message, ConfigurationExitCode);
+        }
+        catch (SyncDeviceAuthorizationException exception)
         {
             return WriteFailure(exception.Message, ConfigurationExitCode);
         }
@@ -165,6 +183,12 @@ public static class SyncCommand
                 Console.WriteLine(
                     $"Applied sequence {page.FirstSequence}-{page.LastSequence} " +
                     $"({page.EntryCount} change(s)); observed head {page.ObservedHead}.");
+                break;
+            case SyncUploadBatchAppliedProgress upload:
+                Console.WriteLine(
+                    $"Uploaded {upload.OperationCount} operation(s): " +
+                    $"{upload.AcceptedCount} accepted, {upload.ConflictCount} conflicted, " +
+                    $"{upload.RejectedCount} rejected.");
                 break;
         }
     }
@@ -277,6 +301,8 @@ public static class SyncCommand
         Console.WriteLine();
         Console.WriteLine(
             $"Set {HttpSyncTransport.ReadKeyEnvironmentVariable} to the server's read key first.");
+        Console.WriteLine(
+            $"Set {HttpSyncTransport.DeviceKeyEnvironmentVariable} when pending local changes must upload.");
         Console.WriteLine("Use a new, dedicated data directory for the first pairing.");
     }
 

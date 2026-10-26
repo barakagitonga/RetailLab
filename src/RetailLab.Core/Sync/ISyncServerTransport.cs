@@ -1,7 +1,7 @@
 namespace RetailLab.Core;
 
 /// <summary>
-/// Transport-independent boundary for the read-only synchronization server.
+/// Transport-independent boundary for the synchronization server.
 /// </summary>
 public interface ISyncServerTransport
 {
@@ -11,5 +11,9 @@ public interface ISyncServerTransport
 
     Task<PullResponse> PullAsync(
         PullRequest request,
+        CancellationToken cancellationToken = default);
+
+    Task<UploadResponse> UploadAsync(
+        UploadRequest request,
         CancellationToken cancellationToken = default);
 }

@@ -7,6 +7,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="RetailLab.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\RetailLab.Core\RetailLab.Core.csproj" />
     <ProjectReference Include="..\RetailLab.Data\RetailLab.Data.csproj" />
   </ItemGroup>

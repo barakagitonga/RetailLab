@@ -1,8 +1,9 @@
 # RetailLab synchronization design (Tutorial 7A)
 
-Status: **approved design direction, implemented through Tutorial 7C-ii.**
-Sections 7B, 7C-i, and 7C-ii now describe working foundations, server feed/API,
-and headless read-only client behavior. Uploads and later phases remain design.
+Status: **approved design direction, implemented through Tutorial 7E.**
+Sections 7B through 7E now describe working foundations, the server feed/API,
+the headless client, authenticated product-operation upload, and synchronized
+inventory adjustments. WPF synchronization remains later work.
 
 ## 1. Purpose and boundaries
 
@@ -30,10 +31,10 @@ composition in an interface project such as LabCli.
 
 **Current state (verified in the repository).** The normal website, interactive
 console, and desktop modes can still deliberately share one local SQLite file
-through `RETAILLAB_DATA_DIRECTORY`. Separately, the 7C-ii LabCli `sync` command
-can create a dedicated client SQLite database, pair it once with Web, and pull
-the authoritative product feed incrementally. Desktop still uses local shared-
-file coordination; uploads and bidirectional synchronization do not exist yet.
+through `RETAILLAB_DATA_DIRECTORY`. Separately, LabCli can pair a dedicated
+client database, capture five product-operation types offline, authenticate
+with an enrolled per-device secret, push its outbox, and then pull the
+authoritative feed. WPF integration remains deferred.
 
 **Target state (approved direction).** The website uses an authoritative
 server-side database. Each desktop installation keeps its own local SQLite
@@ -184,9 +185,9 @@ Initial operation set (product management only):
 - update details (Product GUID, new description, new price, base server
   revision);
 - archive / unarchive (Product GUID, base server revision);
-- inventory adjustment (Product GUID, signed delta, reason, actor as
-  *claimed* context only — the server re-resolves the actor from
-  authentication).
+- inventory adjustment (Product GUID, signed delta, and fixed reason token;
+  no actor field is accepted from the body — the server uses authenticated
+  device attribution).
 
 Inventory sync sends the immutable adjustment operation — "add 5 for this
 reason" — never "set stock to 42". Absolute stock values from a stale device
@@ -283,9 +284,10 @@ and cursor make coarser guarantees from small atomic steps.
 - **Local page apply.** Applying one downloaded page of server changes and
   advancing the local cursor must be one local transaction. Crash before
   commit and the page replays; crash after commit and the cursor proves it.
-- **Server operation apply (accepted).** Applying one uploaded operation, writing its
-  inbox receipt, and publishing the corresponding server change-feed entry
-  must be one server transaction.
+- **Server operation apply (accepted).** Applying one uploaded operation,
+  writing its business ledger row when applicable, advancing the product
+  revision, publishing the corresponding server change-feed entry, and
+  writing its inbox receipt must be one server transaction.
 - **Server conflict/rejection record.** A conflict or rejection atomically
   records its receipt plus a diagnostic snapshot or details, with no business
   mutation and no authoritative change-feed entry unless a future design
@@ -328,9 +330,9 @@ it as "needs attention" until staff resolve it deliberately.
   "needs attention" and returns the authoritative server
   snapshot so staff can re-apply their intent against current values.
 - *Inventory adjustment:* apply its delta exactly once against the
-  authoritative current stock. Reject it if it would produce negative stock
-  or violate another business rule; the rejection names the rule so staff
-  understand what happened.
+  authoritative current stock, rebasing over moved revisions. A below-zero
+  result is a Conflict (`insufficient_stock`); malformed, future-base, or
+  archived operations are Rejected with stable codes.
 - *Server checkout:* checkout keeps reducing authoritative stock on the
   server and publishes the resulting product/adjustment changes for desktops
   to pull like any other change.
@@ -340,11 +342,11 @@ it as "needs attention" until staff resolve it deliberately.
 
 ## 14. Authentication and trust boundaries
 
-**Fact.** The repository has customer authentication only: standard ASP.NET
-Core Identity with unique emails, framework-managed password hashing, and
-cookie sign-in. Staff interfaces use fixed demo actor labels
-(`staff-console`, `staff-desktop`); there is no staff login, no device
-identity, and no authorization model for devices.
+**Implemented in 7D.** Customer authentication remains separate. Upload clients
+now have a client-generated `DeviceId` plus an explicitly enrolled bearer
+secret. The server stores only an Identity `PasswordHasher<SyncDevice>` hash,
+authorizes the single `staff` device role, and copies server-owned audit labels
+onto each receipt. This is device authentication, not a personal staff login.
 
 **Approved direction.** The server owns a trust boundary around every sync
 endpoint: it authenticates the desktop/device, authorizes the requested
@@ -354,12 +356,37 @@ authoritative version, timestamps, or authorization claims — those fields
 are, at best, hints for error messages. Credentials must never be
 hard-coded or committed (per `AGENTS.md` security rules).
 
-**Gate.** State-changing synchronization must not be exposed before an
-authentication/authorization design for staff devices exists. Designing that
-mechanism (which credentials, which roles, how devices enroll and rotate
-secrets) is deferred work, but it is a prerequisite for 7D/7E, not an
-afterthought. Read-only bootstrap/pull design (7C) must state what identity,
-if any, it requires before it is built.
+Uploads use `X-RetailLab-Device-Id` and `X-RetailLab-Device-Key`; the upload
+body contains no device identity and does not require the development read
+key. Unknown, mistyped, and revoked credentials share one 401 response;
+authenticated non-staff data fails closed with 403. Timing equalization,
+HTTPS enforcement, rate limiting, and production OS credential storage remain
+explicit hardening work. See [DEVICE-ENROLLMENT.md](DEVICE-ENROLLMENT.md).
+
+### 14a. Tutorial 7D upload protocol
+
+`POST /api/sync/v1/upload` accepts protocol version 1 and up to 100 operations
+in a 256 KB body. The client uses batches of 25 in `LocalSequence` order.
+Create, update-details, archive, and unarchive are supported; chains may cross
+batches because an accepted predecessor receipt records its resulting server
+revision.
+
+Web first parses a wire draft and computes a server-owned SHA-256 fingerprint,
+then attempts to construct the Core operation. The canonical input has a fixed
+field order and length-prefixed `M`, `N`, or `V` presence state, so missing,
+null, empty, and whitespace-only values remain distinct. SHA-256 collisions
+are computationally infeasible for this integrity use; this is not a claim of
+mathematical impossibility.
+
+Receipts are device-scoped. The same device plus the same fingerprint replays
+the durable result; changed content gets `operation_id_payload_mismatch`, a
+different device gets `operation_id_conflict`, and legacy receipts without a
+device or hash fail closed. Every operation owns one server transaction:
+accepted changes commit product, revision, feed, and receipt together, while
+conflicts/rejections commit only their receipt. Concurrency is checked before
+archive-state validity. A transient mid-batch failure returns 503 without
+actionable results, so the client keeps the whole batch Pending and later
+recovers through receipts.
 
 ## 15. Desktop synchronization UX
 
@@ -421,11 +448,13 @@ Each slice stays narrow and independently verifiable:
   block, atomic page/cursor application, strict protocol checks, and a LabCli
   command using an explicit server and dedicated data directory.
 - **7D: authenticated desktop outbox upload for product management
-  operations** — requires the staff-device authentication design from
-  section 14; create/update/archive/unarchive upload with receipts.
+  operations** — implemented: device enrollment/rotation/revocation,
+  fingerprinted device-scoped receipts, transactional offline capture,
+  bounded push batches, and push-then-pull LabCli orchestration.
 - **7E: inventory adjustment upload and server checkout changes flowing back
-  to desktop** — delta operations up, authoritative stock and adjustment log
-  down.
+  to desktop** — implemented: signed delta operations with fixed reasons,
+  adjustment-specific rebasing and below-zero conflict handling, applied-only
+  ledger promotion, response validation, and authoritative stock flowing down.
 - **Later:** conflict-resolution UI, background scheduling, existing-database
   pairing/migration strategy, production hardening, and deployment decisions.
 
@@ -441,12 +470,9 @@ dependency order, not marketing names.)
 
 **Deferred (recorded honestly, decided later with evidence).**
 
-- Staff-device authentication mechanism, roles, enrollment, and rotation.
-- Upload transport shape and protocol version negotiation beyond the implemented
-  versioned read-only `/api/sync/v1/pair` and `/api/sync/v1/pull` endpoints.
+- Protocol negotiation beyond upload version 1 and the existing pair/pull API.
 - Retry policy details (attempt counts, waits, backoff).
-- Batch limits for push. Pull currently defaults to 100 entries and permits an
-  explicit client page size from 1 through 500.
+- A future receipt/device pruning policy; 7D retains both indefinitely.
 - Existing-database pairing/migration strategy for divergent GUIDs.
 - Conflict-resolution UI beyond "needs attention" plus authoritative
   snapshot display.

@@ -5,11 +5,19 @@ public sealed record SyncRunResult(
     int PagesApplied,
     int EntriesApplied,
     long Cursor,
-    long ObservedHead);
+    long ObservedHead,
+    int UploadBatches = 0,
+    int OperationsUploaded = 0);
 
 public abstract record SyncProgress;
 
 public sealed record SyncPairedProgress(Guid ServerInstanceId, long HeadSequence) : SyncProgress;
+
+public sealed record SyncUploadBatchAppliedProgress(
+    int OperationCount,
+    int AcceptedCount,
+    int ConflictCount,
+    int RejectedCount) : SyncProgress;
 
 public sealed record SyncPageAppliedProgress(
     long FirstSequence,

@@ -16,7 +16,31 @@ public sealed class InventoryAdjustment
         string reason,
         string actorIdentifier,
         DateTimeOffset createdAtUtc)
+        : this(
+            Guid.NewGuid(),
+            product,
+            quantityChange,
+            resultingQuantity,
+            reason,
+            actorIdentifier,
+            createdAtUtc)
     {
+    }
+
+    public InventoryAdjustment(
+        Guid id,
+        Product product,
+        int quantityChange,
+        int resultingQuantity,
+        string reason,
+        string actorIdentifier,
+        DateTimeOffset createdAtUtc)
+    {
+        if (id == Guid.Empty)
+        {
+            throw new ArgumentException("Inventory adjustment ID cannot be empty.", nameof(id));
+        }
+
         ArgumentNullException.ThrowIfNull(product);
 
         if (quantityChange == 0)
@@ -30,7 +54,7 @@ public sealed class InventoryAdjustment
                 $"Adjustment would leave {product.Sku} with negative stock.");
         }
 
-        Id = Guid.NewGuid();
+        Id = id;
         ProductId = product.Id;
         Product = product;
         QuantityChange = quantityChange;
