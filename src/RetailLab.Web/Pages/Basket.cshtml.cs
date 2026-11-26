@@ -145,7 +145,7 @@ public class BasketModel(
             // A missing or unparseable attempt id binds as null; the service
             // rejects it as an expired checkout.
             var order = await checkout.CheckoutBasketAsync(customerId, checkoutAttemptId ?? Guid.Empty);
-            StatusMessage = "Your simulated order was placed.";
+            StatusMessage = "Your order was placed.";
             return RedirectToPage("/Orders/Details", new { id = order.Id });
         }
         catch (BusinessRuleException exception)

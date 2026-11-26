@@ -53,6 +53,7 @@ builder.Services.AddScoped<IPasswordHasher<SyncDevice>, PasswordHasher<SyncDevic
 builder.Services.AddScoped<SyncDeviceCredentialService>();
 builder.Services.AddScoped<ServerSyncOperationProcessor>();
 builder.Services.AddSingleton<CatalogDisplayMapper>();
+builder.Services.AddSingleton<ProductImageResolver>();
 
 var app = builder.Build();
 

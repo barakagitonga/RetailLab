@@ -6,50 +6,68 @@
 
 <h1>Catalogue</h1>
 
+@* Trust-perks strip *@
+<div class="perks" role="list">
+    <p class="perk" role="listitem"><span class="perk-icon" aria-hidden="true">★</span> Free local pickup on every order</p>
+    <p class="perk" role="listitem"><span class="perk-icon" aria-hidden="true">✓</span> 30-day easy returns</p>
+    <p class="perk" role="listitem"><span class="perk-icon" aria-hidden="true">☎</span> Friendly support, seven days a week</p>
+</div>
+
 @if (Model.Products.Count == 0)
 {
     <p>No products are available right now. Please check back later.</p>
 }
 else
 {
-    <ul class="cards">
+    <ul class="cards card-row catalogue-grid">
         @foreach (var product in Model.Products)
         {
-            <li class="card">
-                <h2><a asp-page="/Product" asp-route-sku="@product.Sku">@product.Description</a></h2>
-                <p class="sku">Product code: @product.Sku</p>
-                <p class="price">@product.PriceDisplay</p>
-                <p class="availability @product.AvailabilityTone">@product.Availability</p>
-                @if (User.Identity?.IsAuthenticated == true)
-                {
-                    if (Model.FavouriteSkus.Contains(product.Sku))
+            <li class="card product-card">
+                <a class="card-media" asp-page="/Product" asp-route-sku="@product.Sku" tabindex="-1" aria-hidden="true">
+                    @if (product.HasImage)
                     {
-                        <form method="post" asp-page="/Favourites" asp-page-handler="Remove">
+                        <img src="@product.ImageUrl" alt="" loading="lazy" />
+                    }
+                    else
+                    {
+                        <span class="card-placeholder"><span>@product.Sku</span></span>
+                    }
+                </a>
+                <div class="card-body">
+                    <h2><a asp-page="/Product" asp-route-sku="@product.Sku">@product.Description</a></h2>
+                    <p class="price">@product.PriceDisplay</p>
+                    <p class="availability @product.AvailabilityTone">@product.Availability</p>
+                    @if (User.Identity?.IsAuthenticated == true)
+                    {
+                        if (Model.FavouriteSkus.Contains(product.Sku))
+                        {
+                            <form method="post" asp-page="/Favourites" asp-page-handler="Remove">
+                                <input type="hidden" name="sku" value="@product.Sku" />
+                                <input type="hidden" name="returnUrl" value="@Request.Path" />
+                                <button type="submit">Remove from favourites</button>
+                            </form>
+                        }
+                        else
+                        {
+                            <form method="post" asp-page="/Favourites" asp-page-handler="Add">
+                                <input type="hidden" name="sku" value="@product.Sku" />
+                                <input type="hidden" name="returnUrl" value="@Request.Path" />
+                                <button type="submit">Add to favourites</button>
+                            </form>
+                        }
+                        <form method="post" asp-page="/Basket" asp-page-handler="Add">
                             <input type="hidden" name="sku" value="@product.Sku" />
+                            <input type="hidden" name="quantity" value="1" />
                             <input type="hidden" name="returnUrl" value="@Request.Path" />
-                            <button type="submit">Remove from favourites</button>
+                            <button type="submit">Add to basket</button>
                         </form>
                     }
                     else
                     {
-                        <form method="post" asp-page="/Favourites" asp-page-handler="Add">
-                            <input type="hidden" name="sku" value="@product.Sku" />
-                            <input type="hidden" name="returnUrl" value="@Request.Path" />
-                            <button type="submit">Add to favourites</button>
-                        </form>
+                        <p><a asp-page="/Account/Login" asp-route-returnUrl="@Request.Path">Sign in to save</a></p>
+                        <p><a asp-page="/Account/Login" asp-route-returnUrl="@Request.Path">Sign in to add to basket</a></p>
                     }
-                    <form method="post" asp-page="/Basket" asp-page-handler="Add">
-                        <input type="hidden" name="sku" value="@product.Sku" />
-                        <input type="hidden" name="quantity" value="1" />
-                        <input type="hidden" name="returnUrl" value="@Request.Path" />
-                        <button type="submit">Add to basket</button>
-                    </form>
-                }
-                else
-                {
-                    <p><a asp-page="/Account/Login" asp-route-returnUrl="@Request.Path">Sign in to save</a></p>
-                    <p><a asp-page="/Account/Login" asp-route-returnUrl="@Request.Path">Sign in to add to basket</a></p>
-                }
+                </div>
             </li>
         }
     </ul>

@@ -9,10 +9,11 @@ namespace RetailLab.Web.Pages;
 public class ProductsModel(
     CatalogService catalog,
     CatalogDisplayMapper mapper,
+    ProductImageResolver images,
     BookmarkService bookmarks,
     UserManager<IdentityUser> users) : PageModel
 {
-    public IReadOnlyList<ProductSummary> Products { get; private set; } = [];
+    public IReadOnlyList<ProductCard> Products { get; private set; } = [];
 
     public IReadOnlySet<string> FavouriteSkus { get; private set; } =
         new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -20,7 +21,11 @@ public class ProductsModel(
     public async Task OnGetAsync()
     {
         var active = await catalog.GetActiveProductsAsync();
-        Products = active.Select(mapper.ToSummary).ToList();
+        Products = active
+            .Select(product => ProductCard.From(
+                mapper.ToSummary(product),
+                images.Resolve(product.Sku)))
+            .ToList();
 
         // Anonymous visitors get no favourite state; the view shows them a
         // sign-in link instead of a form, so no POST is ever at stake.

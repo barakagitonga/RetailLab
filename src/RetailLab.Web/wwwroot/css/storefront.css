@@ -1,0 +1,831 @@
+/* Storefront sprint styles (checkpoints S2-S4, R2 Frutiger Aero refresh).
+   Extends site.css tokens with a dark storefront palette; keeps the existing
+   light-surface conventions for forms and notices. Zero scripts: the hero
+   slideshow is a native radio-input crossfade and the reviews panel is a
+   native scroll-snap strip. Contrast targets are WCAG AA (4.5:1 normal text,
+   3:1 large); every pair in this file was audited numerically in the S4
+   checkpoint and the R2 additions are audited per the R1 contract (the
+   lowest S4 ratio was hero button white-on-teal at 5.47:1). */
+
+:root {
+    --store-deep: #0f172a;      /* hero gradient start */
+    --store-teal: #134e4a;      /* hero gradient end */
+    --store-accent: #0f766e;    /* matches the existing teal accent */
+    --store-accent-dark: #115e59; /* placeholder tile gradient end (7.4:1 on white text) */
+    --store-soft: #f8fafc;      /* light band background */
+    --store-chip-bg: #fef3c7;   /* demo tag background */
+    --store-chip-ink: #451a03;  /* demo tag text, ~10:1 on the chip */
+    --store-muted-strong: #374151; /* darker muted ink for small text on light cards */
+
+    /* Header height fallback — script measures actual header and sets on :root */
+    --header-height: 4.5rem;
+}
+
+/* Mobile fallback: at max-width: 40rem the header is two rows.
+   Measured at 390px viewport, the two-row header is ~88px; rounded up to 6rem (96px) for safety. */
+@media (max-width: 40rem) {
+    :root {
+        --header-height: 6rem;
+    }
+}
+
+/* R2 Frutiger Aero tokens, from the R1 design contract (section 3).
+   Only the values actually used by the landing/review change set are
+   declared here; other shifts add their own tokens from the same
+   finite contract rather than inventing one-off colours. */
+:root {
+    --aero-blue-500: #0EA5E9;    /* primary aurora stop (decorative only) */
+    --aero-teal-500: #14B8A6;    /* secondary aurora stop (decorative only) */
+    --aero-green-400: #4ADE80;   /* third aurora stop (decorative only) */
+    --aero-hot: #B93815;         /* HOT Demo pill; white text audited independently */
+    --aero-ink: #102A43;         /* primary text on light scrims */
+    --aero-muted: #334E68;       /* secondary text on light scrims */
+    --aero-scrim-light: #F7FBFF; /* solid light scrim behind dark text */
+    --aero-scrim-dark: #102A43;  /* solid dark scrim behind light text */
+    --aero-glass-border: rgba(255, 255, 255, 0.40); /* one-pixel glass outline */
+    --aero-radius-md: 1.25rem;   /* product and review cards */
+    --aero-radius-lg: 2rem;      /* hero panel */
+    --aero-shadow-soft: 0 12px 30px rgba(16, 42, 67, 0.18);
+    --aero-shadow-lift: 0 18px 42px rgba(16, 42, 67, 0.26); /* hovered card R1 6.3 */
+    --aero-highlight: linear-gradient(180deg, rgba(255,255,255,.72), rgba(255,255,255,0) 46%);
+}
+
+/* ---------- Hero slideshow (auto-advance ~15s, manual dots) ---------- */
+
+.hero-slideshow {
+    position: relative;
+    width: 100vw;
+    max-width: none;
+    margin-left: calc(50% - 50vw);
+    margin-right: calc(50% - 50vw);
+    margin-bottom: 2.5rem;
+    border-radius: 0;
+    overflow: hidden;
+    color: #ffffff;
+    margin-top: calc(-1 * var(--header-height));
+    padding-top: var(--header-height);
+}
+
+.hero-slides {
+    display: grid;
+}
+
+.hero-state {
+    /* visually hidden but still keyboard-focusable */
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    border: 0;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    pointer-events: none;
+}
+
+.hero-slide {
+    grid-area: 1 / 1;
+    margin: 0;
+    padding: 3rem 1.25rem 3.5rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 21rem;
+    opacity: 0;
+    transition: opacity 0.7s ease;
+    background-size: cover;
+    background-position: center;
+}
+
+.slide-a {
+    background-image: url('../images/hero/collage-border-slide-a.jpg');
+}
+
+.slide-b {
+    background-image: url('../images/hero/collage-border-slide-b.jpg');
+}
+
+.slide-c {
+    background-image: url('../images/hero/collage-border-slide-c.jpg');
+}
+
+.slide-d {
+    background-image: url('../images/hero/collage-border-slide-d.jpg');
+}
+
+.hero-state:nth-of-type(1):checked ~ .hero-slides .slide-a,
+.hero-state:nth-of-type(2):checked ~ .hero-slides .slide-b,
+.hero-state:nth-of-type(3):checked ~ .hero-slides .slide-c,
+.hero-state:nth-of-type(4):checked ~ .hero-slides .slide-d {
+    opacity: 1;
+}
+
+/* Product card backgrounds: each .hero-copy gets its featured product photo.
+   Dark tint via --card-tint (default 0.32) applied as inset box-shadow.
+   White text with soft text-shadow for readability. No gradient anywhere. */
+.hero-copy {
+    max-width: 44rem;
+    margin: 0 auto;
+    width: 100%;
+    background-size: cover;
+    background-position: center;
+    border-radius: var(--aero-radius-lg);
+    box-shadow:
+        var(--aero-shadow-soft),
+        inset 0 0 0 9999px var(--card-tint, rgba(9, 24, 38, 0.32));
+    padding: 1.75rem 1.5rem;
+    position: relative;
+    color: #fff;
+    text-shadow: 0 1px 3px rgba(0,0,0,.55), 0 0 14px rgba(0,0,0,.35);
+    display: flex;
+    flex-direction: column;
+}
+
+.slide-a .hero-copy {
+    background-image: url('../images/products/BRI-210.jpg');
+}
+
+.slide-b .hero-copy {
+    background-image: url('../images/products/CIR-320.jpg');
+}
+
+.slide-c .hero-copy {
+    background-image: url('../images/products/AUR-100.jpg');
+}
+
+.slide-d .hero-copy {
+    background-image: url('../images/products/EMBER-540.jpg');
+}
+
+/* Per-card tint overrides — only raise, never lower below 0.32.
+   Report final values if adjusted. */
+.slide-a .hero-copy { --card-tint: rgba(9, 24, 38, 0.32); }
+.slide-b .hero-copy { --card-tint: rgba(9, 24, 38, 0.32); }
+.slide-c .hero-copy { --card-tint: rgba(9, 24, 38, 0.32); }
+.slide-d .hero-copy { --card-tint: rgba(9, 24, 38, 0.32); }
+
+.hero-kicker {
+    margin: 0 0 0.5rem;
+    font-size: 0.85rem;
+    font-weight: bold;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: #fff;
+}
+
+.hero-copy h1 {
+    font-size: clamp(1.8rem, 4vw, 2.6rem);
+    margin: 0 0 0.6rem;
+    color: #fff;
+}
+
+.hero-sub {
+    margin: 0 0 1.4rem;
+    font-size: 1.05rem;
+    color: #fff;
+    max-width: 34rem;
+}
+
+.hero-copy .hero-button {
+    position: relative;
+}
+
+.hero-button {
+    display: inline-block;
+    background: var(--store-accent); /* #0f766e, white text = 4.6:1 */
+    color: #fff;
+    text-decoration: none;
+    font-weight: bold;
+    padding: 0.65rem 1.4rem;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.35);
+}
+
+.hero-button:hover {
+    background: var(--store-accent-dark);
+}
+
+.hero-button:focus-visible,
+.hero-dot:focus-visible {
+    outline: 3px solid #99f6e4;
+    outline-offset: 2px;
+}
+
+/* keyboard focus lands on the hidden radios; dots visualize it.
+   The first rule is the no-:has fallback (all dots outline); the :has rules
+   outline only the active dot in modern browsers. */
+.hero-state:focus-visible ~ .hero-dots label[for] {
+    outline: 3px solid #99f6e4;
+    outline-offset: 2px;
+}
+
+.hero-dots:has(#hero-slide-1:focus-visible) label[for="hero-slide-1"],
+.hero-dots:has(#hero-slide-2:focus-visible) label[for="hero-slide-2"],
+.hero-dots:has(#hero-slide-3:focus-visible) label[for="hero-slide-3"],
+.hero-dots:has(#hero-slide-4:focus-visible) label[for="hero-slide-4"] {
+    outline: 3px solid #99f6e4;
+    outline-offset: 2px;
+}
+
+.hero-dots {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    bottom: 1rem;
+    display: flex;
+    gap: 0.5rem;
+    z-index: 2;
+}
+
+.hero-dot {
+    display: inline-block;
+    width: 0.8rem;
+    height: 0.8rem;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.35);
+}
+
+.hero-dot:hover {
+    background: rgba(255, 255, 255, 0.65);
+}
+
+.hero-state:nth-of-type(1):checked ~ .hero-dots label[for="hero-slide-1"],
+.hero-state:nth-of-type(2):checked ~ .hero-dots label[for="hero-slide-2"],
+.hero-state:nth-of-type(3):checked ~ .hero-dots label[for="hero-slide-3"],
+.hero-state:nth-of-type(4):checked ~ .hero-dots label[for="hero-slide-4"] {
+    background: #99f6e4;
+}
+
+/* Slide A scrolling product strip — inside .hero-copy, so the slide is a column */
+.hero-strip {
+    margin-top: 1.25rem;
+    padding: 0.5rem 0.75rem;
+    background: rgba(9, 24, 38, 0.45);
+    border-radius: 0.75rem;
+    overflow-x: auto;
+    scroll-snap-type: x proximity;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+    display: flex;
+    gap: 0.5rem;
+    padding-bottom: 0.75rem; /* space for scrollbar */
+    min-width: 0; /* never forces the card wider than the viewport */
+}
+
+.hero-strip a {
+    flex: 0 0 60px;
+    width: 60px;
+    height: 60px;
+    border-radius: 0.5rem;
+    overflow: hidden;
+    scroll-snap-align: start;
+    display: block;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.hero-strip img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.hero-strip a:focus-visible {
+    outline: 3px solid #99f6e4;
+    outline-offset: 2px;
+    z-index: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    /* static hero: panel 1, no crossfade (checked selections still work) */
+    .hero-slide {
+        transition: none;
+    }
+
+    .hero-state:nth-of-type(2):checked ~ .hero-slides .slide-b,
+    .hero-state:nth-of-type(3):checked ~ .hero-slides .slide-c,
+    .hero-state:nth-of-type(4):checked ~ .hero-slides .slide-d {
+        opacity: 0;
+    }
+
+    .hero-state:nth-of-type(1):checked ~ .hero-slides .slide-a {
+        opacity: 1;
+    }
+}
+
+/* ---------- Demo tag + perks strip ---------- */
+
+.demo-tag {
+    display: inline-block;
+    background: var(--store-chip-bg);
+    color: var(--store-chip-ink);
+    border: 1px solid #b45309;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: bold;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 0.1rem 0.6rem;
+    vertical-align: middle;
+}
+
+.perks {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem 1.4rem;
+    background: var(--store-soft);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 0.6rem 1rem;
+    margin: 0 0 1.5rem;
+}
+
+.perk {
+    margin: 0;
+    color: var(--store-muted-strong); /* small-text-safe muted, darker than --muted */
+    font-size: 0.92rem;
+}
+
+.perk-icon {
+    color: var(--store-accent-dark);
+    margin-right: 0.35rem;
+}
+
+/* ---------- Product cards ---------- */
+
+.card-row {
+    gap: 1.1rem;
+}
+
+/* ---------- Product cards (R3, R1 contract sections 5/6) ----------
+   Glass product cards per the R1 page map (line 42): a horizontal CSS
+   scroll-snap image strip on top, then a SOLID text scrim with name, price,
+   stock, and actions. Glass = radius/gloss-edge/shadow decoration only; the
+   card body fill is the solid --aero-scrim-light (readability rule 1).
+   Rating/count derive only from the in-memory demo-review records. HOT uses
+   one deterministic rule: membership in the existing Featured demo
+   arrangement, never sales volume. The pill visibly says Demo. */
+.product-card {
+    padding: 0;
+    border-radius: var(--aero-radius-md);
+    border: 1px solid rgba(51, 78, 104, 0.18); /* glass edge: --aero-muted at 18% on the light page */
+    box-shadow: var(--aero-shadow-soft);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    transition: transform 0.45s ease, box-shadow 0.45s ease;
+}
+
+.product-card:hover {
+    transform: translateY(-2px); /* gentle lift, no layout shift - R1 6.3 */
+    box-shadow: var(--aero-shadow-lift);
+}
+
+.card-media {
+    display: flex;
+    overflow-x: auto;
+    scroll-snap-type: x proximity;
+    overscroll-behavior-x: contain;
+    aspect-ratio: 4 / 3;
+    background: var(--wash);
+    border-bottom: 1px solid rgba(51, 78, 104, 0.14);
+}
+
+/* one image is a valid strip (R1 6.1); multiple verified images would slide
+   natively in this same container - no duplicate, hotlinked, or mismatched
+   assets are added to fill it */
+.card-media img {
+    flex: 0 0 100%;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    scroll-snap-align: start;
+    display: block;
+}
+
+.card-placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    background: linear-gradient(135deg, var(--store-teal) 0%, var(--store-accent-dark) 100%);
+    color: #ffffff; /* >= 7:1 on both stops */
+    font-weight: bold;
+    letter-spacing: 0.12em;
+}
+
+.card-body {
+    padding: 1rem 1.15rem 1.15rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    flex: 1;
+    /* solid text scrim - R1 readability rule 1: decorative glass never
+       carries text; every card text pair below is audited against this
+       one deterministic fill */
+    background: var(--aero-scrim-light);
+    color: var(--aero-ink);
+}
+
+.card-body h2,
+.card-body h3 {
+    margin: 0 0 0.3rem;
+    font-size: 1.02rem;
+}
+
+.card-review-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.35rem 0.6rem;
+}
+
+.card-rating {
+    margin: 0;
+    color: var(--aero-muted);
+    font-size: 0.88rem;
+    font-weight: 600;
+}
+
+.card-rating a {
+    color: var(--store-accent-dark);
+}
+
+.card-rating a:hover,
+.card-rating a:focus-visible {
+    text-decoration-thickness: 2px;
+}
+
+.hot-pill {
+    display: inline-block;
+    background: var(--aero-hot);
+    color: #ffffff;
+    border: 1px solid #7C2D12;
+    border-radius: 999px;
+    padding: 0.12rem 0.55rem;
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    line-height: 1.35;
+    text-transform: uppercase;
+}
+
+.card-body h2 a,
+.card-body h3 a {
+    text-decoration: none;
+}
+
+.card-body h2 a:hover,
+.card-body h3 a:hover,
+.card-body h2 a:focus-visible,
+.card-body h3 a:focus-visible {
+    text-decoration: underline;
+}
+
+.card-body .price {
+    margin: 0;
+}
+
+.card-body .availability {
+    align-self: flex-start;
+    margin-bottom: 0.4rem;
+}
+
+.card-body form {
+    margin-top: 0.5rem;
+}
+
+/* ---------- Product detail (S3) ---------- */
+
+.detail-grid {
+    display: grid;
+    gap: 1.5rem;
+    margin-top: 0.5rem;
+}
+
+.detail-media {
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    overflow: hidden;
+    background: var(--wash);
+}
+
+.detail-media img {
+    display: block;
+    width: 100%;
+    aspect-ratio: 4 / 3;
+    object-fit: cover;
+}
+
+.detail-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    min-height: 16rem;
+    background: linear-gradient(135deg, var(--store-teal) 0%, var(--store-accent-dark) 100%);
+    color: #ffffff;
+    font-weight: bold;
+    letter-spacing: 0.12em;
+}
+
+.detail-placeholder small {
+    font-weight: normal;
+    letter-spacing: normal;
+    color: #e6fffb;
+}
+
+.detail-facts h1 {
+    margin-bottom: 0.5rem;
+}
+
+.detail-facts .price {
+    font-size: 1.4rem;
+}
+
+.detail-facts .availability {
+    margin-bottom: 0.75rem;
+}
+
+.detail-facts form {
+    margin: 0.5rem 0;
+}
+
+.buy-row,
+.detail-facts form {
+    display: block;
+}
+
+.demo-accordion,
+.demo-reviews {
+    margin-top: 2rem;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 1rem 1.25rem;
+    background: var(--store-soft);
+}
+
+.demo-accordion details {
+    border-top: 1px solid var(--line);
+    padding: 0.35rem 0;
+}
+
+.demo-accordion details:first-of-type {
+    border-top: none;
+}
+
+.demo-accordion summary {
+    cursor: pointer;
+    font-weight: bold;
+    padding: 0.35rem 0;
+}
+
+.demo-accordion summary:focus-visible {
+    outline: 3px solid var(--accent);
+    outline-offset: 2px;
+}
+
+.demo-accordion details p {
+    color: var(--store-muted-strong);
+    margin: 0.35rem 0 0.6rem;
+}
+
+.demo-heading {
+    margin: 0 0 0.5rem;
+    font-size: 1.2rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.demo-caption {
+    color: var(--store-muted-strong);
+    font-size: 0.9rem;
+    margin: 0 0 0.6rem;
+}
+
+.demo-reviews ul {
+    margin: 0;
+    padding-left: 1.25rem;
+}
+
+.demo-reviews li {
+    margin-bottom: 0.35rem;
+}
+
+.demo-inline {
+    color: var(--store-muted-strong);
+    font-size: 0.85rem;
+}
+
+/* ---------- Landing reviews panel (R2, R1 contract section 5) ----------
+   Horizontal native scroll-snap row below the hero. No auto-play: the row
+   moves only under user input (wheel/touch/drag/keyboard via tabindex=0).
+   Each card is a solid light scrim (--aero-scrim-light) with a glassy
+   gradient face; the translucency stays decorative, the text never sits on
+   transparent glass. proximity snapping so the strip never traps page
+   scrolling. */
+
+.reviews-panel {
+    margin-top: 2.25rem;
+}
+
+.reviews-caption {
+    width: 100%;
+    margin: 0;
+    color: var(--store-muted-strong); /* audited pair on --paper, S4 baseline */
+    font-size: 0.9rem;
+}
+
+.reviews-track {
+    list-style: none;
+    display: flex;
+    gap: 1rem;
+    margin: 0.9rem 0 0;
+    padding: 0.25rem 0.25rem 0.9rem;
+    overflow-x: auto;
+    scroll-snap-type: x proximity;
+    overscroll-behavior-x: contain;
+}
+
+/* keyboard reachability: the scroll container itself is focusable (matches
+   the site.css outline convention) */
+.reviews-track:focus-visible {
+    outline: 3px solid var(--accent);
+    outline-offset: 2px;
+}
+
+.review-card {
+    flex: 0 0 clamp(15rem, 78vw, 17rem);
+    scroll-snap-align: start;
+    /* gradient of two solid near-white stops = effectively solid backing
+       with a glass sheen; no alpha, so the audit ratio is deterministic */
+    background: linear-gradient(180deg, var(--aero-scrim-light) 0%, #EAF4FC 100%);
+    border: 1px solid var(--line);
+    border-radius: var(--aero-radius-md);
+    box-shadow: var(--aero-shadow-soft);
+    padding: 1rem 1.1rem 0.9rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    transition: transform 0.45s ease, box-shadow 0.45s ease;
+}
+
+.review-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--aero-shadow-lift);
+}
+
+.review-text {
+    margin: 0;
+    color: var(--aero-ink);          /* audited pair on the solid card face */
+    line-height: 1.6;                /* R1 --aero-line-body */
+}
+
+.review-meta {
+    margin: auto 0 0;                /* meta pinned to card bottom */
+    color: var(--aero-muted);        /* audited pair on the solid card face */
+    font-size: 0.88rem;
+}
+
+.review-meta a {
+    color: var(--store-accent-dark); /* unchanged link system, re-audited on card face */
+    text-decoration: none;
+}
+
+.review-meta a:hover,
+.review-meta a:focus-visible {
+    text-decoration: underline;
+}
+
+@media (min-width: 40rem) {
+    .detail-grid {
+        grid-template-columns: minmax(0, 5fr) minmax(0, 4fr);
+        align-items: start;
+    }
+
+    .review-card {
+        flex-basis: 17rem;
+    }
+}
+
+/* ---------- Merchandising sections + CTA ---------- */
+
+.merch-section {
+    margin-top: 2.25rem;
+}
+
+.merch-heading {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 0.75rem;
+}
+
+.merch-heading h2 {
+    margin: 0;
+    font-size: 1.4rem;
+}
+
+.merch-note {
+    width: 100%;
+    margin: 0;
+    color: var(--store-muted-strong);
+    font-size: 0.9rem;
+}
+
+.home-cta {
+    margin: 2.75rem 0 1rem;
+    background: var(--store-soft);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 1.6rem 1.25rem;
+    text-align: center;
+}
+
+.home-cta h2 {
+    margin: 0 0 0.4rem;
+    font-size: 1.4rem;
+}
+
+.home-cta p {
+    color: var(--store-muted-strong);
+    margin: 0 0 1rem;
+}
+
+@media (min-width: 40rem) {
+    .card-row {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .hero-slide {
+        padding: 4rem 2rem 4.5rem;
+    }
+}
+
+@media (min-width: 60rem) {
+    .card-row {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+/* ---------- S4 polish: touch targets, small screens, motion ---------- */
+
+/* Touch targets: dots and demo tags stay small visually, but the dot
+   labels get a larger hit area on coarse pointers (WCAG 2.5.8). */
+@media (pointer: coarse) {
+    .hero-dot {
+        position: relative;
+    }
+
+    .hero-dot::before {
+        content: "";
+        position: absolute;
+        inset: -0.55rem;
+    }
+}
+
+/* Very narrow screens: hero type steps down, dots stay reachable. */
+@media (max-width: 22rem) {
+    .hero-slide {
+        padding: 2.25rem 1rem 3rem;
+        min-height: 18rem;
+    }
+
+    .hero-copy h1 {
+        font-size: 1.5rem;
+    }
+
+    .hero-sub {
+        font-size: 0.95rem;
+    }
+}
+
+/* Detail grid stacks below 40rem by default (single column); give the
+   media panel a consistent aspect there. */
+.detail-media {
+    aspect-ratio: 4 / 3;
+}
+
+@media (min-width: 40rem) {
+    .detail-media {
+        aspect-ratio: auto;
+    }
+}
+
+/* Buy-now emphasis: keep the primary action visually distinct but inside
+   the existing button system (site.css .button). */
+.detail-facts .button {
+    margin-top: 0.25rem;
+}
+
+/* Respect reduced motion for the crossfade transition itself. */
+@media (prefers-reduced-motion: reduce) {
+    .hero-slide {
+        transition: none;
+    }
+}

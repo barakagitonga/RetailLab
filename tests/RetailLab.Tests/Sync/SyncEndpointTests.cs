@@ -50,7 +50,7 @@ public sealed class SyncEndpointTests
         var body = await response.Content.ReadFromJsonAsync<PairResponse>();
         Assert.NotNull(body);
         Assert.NotEqual(Guid.Empty, body.ServerInstanceId);
-        Assert.Equal(5, body.HeadSequence);
+        Assert.Equal(10, body.HeadSequence);
         Assert.True(body.ServerTimeUtc <= DateTimeOffset.UtcNow);
     }
 
@@ -83,7 +83,7 @@ public sealed class SyncEndpointTests
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<PullResponse>();
         Assert.NotNull(body);
-        Assert.Equal(5, body.HeadSequence);
+        Assert.Equal(10, body.HeadSequence);
         Assert.True(body.HasMore);
         Assert.Equal([1L, 2L], body.Entries.Select(entry => entry.Sequence));
     }

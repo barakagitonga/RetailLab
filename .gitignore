@@ -492,3 +492,8 @@ retaillab.db-shm
 /.codex-build/
 /output/
 /tmp/
+
+# AI/human coordination scratch files — not part of the project
+/mac-rebuild-brief.md
+/MAC-REBUILD-REPORT.md
+/docs/MUSE-HANDOFF.md

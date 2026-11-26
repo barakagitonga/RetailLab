@@ -54,7 +54,7 @@ else
     <p class="basket-total">Basket total: @Model.BasketTotalDisplay</p>
     <form method="post" asp-page="/Basket" asp-page-handler="Checkout">
         <input type="hidden" name="checkoutAttemptId" value="@Model.CheckoutAttemptId" />
-        <button type="submit">Place simulated order</button>
+        <button type="submit">Place order</button>
     </form>
-    <p class="basket-note">Simulated checkout: no payment is processed. Stock and prices are confirmed when you place your order.</p>
+    <p class="basket-note">No payment is taken in this store. Stock and prices are confirmed when you place your order.</p>
 }

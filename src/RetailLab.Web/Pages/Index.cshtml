@@ -4,30 +4,183 @@
     ViewData["Title"] = "Home";
 }
 
-<section class="hero" aria-labelledby="hero-heading">
-    <h1 id="hero-heading">Welcome to RetailLab</h1>
-    <p>A small demonstration store. Browse the catalogue and inspect product details.</p>
-    <p><a class="button" asp-page="/Products">Browse the catalogue</a></p>
+@* Hero slideshow: native radio-input crossfade with ~15s auto-advance.
+   Keyboard users reach the hidden radios; the dots show focus.
+   Reduced-motion users get panel 1 as a static hero (CSS media query).
+   Timer pauses on hover/focus in hero, on hidden tab, and resets on manual dot tap. *@
+<section class="hero-slideshow" aria-label="Storefront highlights">
+    <input class="hero-state" type="radio" name="hero-slide" id="hero-slide-1" checked />
+    <input class="hero-state" type="radio" name="hero-slide" id="hero-slide-2" />
+    <input class="hero-state" type="radio" name="hero-slide" id="hero-slide-3" />
+    <input class="hero-state" type="radio" name="hero-slide" id="hero-slide-4" />
+
+    <div class="hero-slides">
+        <article class="hero-slide slide-a" aria-labelledby="hero-heading-a">
+            <div class="hero-copy">
+                <p class="hero-kicker">RetailLab</p>
+                <h1 id="hero-heading-a">Everyday essentials, thoughtfully stocked</h1>
+                <p class="hero-sub">Browse the catalogue — mugs, totes, lamps and more — with stock counts on every item.</p>
+                <p><a class="hero-button" asp-page="/Products">Shop the catalogue</a></p>
+                @* Slide A only: horizontal scrolling strip of all 10 product photos *@
+                <nav class="hero-strip" aria-label="All products">
+                    @foreach (var product in Model.AllProducts)
+                    {
+                        <a asp-page="/Product" asp-route-sku="@product.Sku" aria-label="@product.Description">
+                            <img src="@product.ImageUrl" alt="" loading="lazy" />
+                        </a>
+                    }
+                </nav>
+            </div>
+        </article>
+        <article class="hero-slide slide-b" aria-labelledby="hero-heading-b">
+            <div class="hero-copy">
+                <p class="hero-kicker">Featured</p>
+                <h1 id="hero-heading-b">Light the desk</h1>
+                <p class="hero-sub">The Cirrus compact desk lamp sits in our featured picks today.</p>
+                <p><a class="hero-button" asp-page="/Product" asp-route-sku="CIR-320">See the lamp</a></p>
+            </div>
+        </article>
+        <article class="hero-slide slide-c" aria-labelledby="hero-heading-c">
+            <div class="hero-copy">
+                <p class="hero-kicker">Featured</p>
+                <h1 id="hero-heading-c">Carry the day</h1>
+                <p class="hero-sub">The Aurora insulated travel mug is on our featured shelf today.</p>
+                <p><a class="hero-button" asp-page="/Product" asp-route-sku="AUR-100">See the mug</a></p>
+            </div>
+        </article>
+        <article class="hero-slide slide-d" aria-labelledby="hero-heading-d">
+            <div class="hero-copy">
+                <p class="hero-kicker">Featured</p>
+                <h1 id="hero-heading-d">Sound, unplugged</h1>
+                <p class="hero-sub">The Emberline wireless speaker rounds out the featured shelf.</p>
+                <p><a class="hero-button" asp-page="/Product" asp-route-sku="EMBER-540">See the speaker</a></p>
+            </div>
+        </article>
+    </div>
+
+    <div class="hero-dots" aria-label="Choose a highlight">
+        <label class="hero-dot" for="hero-slide-1"><span class="visually-hidden">Highlight 1</span></label>
+        <label class="hero-dot" for="hero-slide-2"><span class="visually-hidden">Highlight 2</span></label>
+        <label class="hero-dot" for="hero-slide-3"><span class="visually-hidden">Highlight 3</span></label>
+        <label class="hero-dot" for="hero-slide-4"><span class="visually-hidden">Highlight 4</span></label>
+    </div>
 </section>
 
-<section aria-labelledby="preview-heading">
-    <h2 id="preview-heading">Catalogue preview</h2>
-    @if (Model.Preview.Count == 0)
-    {
-        <p>No products are available right now. Please check back later.</p>
-    }
-    else
-    {
-        <ul class="cards">
-            @foreach (var product in Model.Preview)
-            {
-                <li class="card">
-                    <h3><a asp-page="/Product" asp-route-sku="@product.Sku">@product.Description</a></h3>
-                    <p class="sku">Product code: @product.Sku</p>
-                    <p class="price">@product.PriceDisplay</p>
-                    <p class="availability @product.AvailabilityTone">@product.Availability</p>
-                </li>
-            }
-        </ul>
-    }
+@* Reviews panel: horizontal native scroll-snap row, no auto-play. *@
+<section class="reviews-panel" aria-labelledby="reviews-heading">
+    <div class="merch-heading">
+        <h2 id="reviews-heading">Reviews</h2>
+        <p class="reviews-caption">Customer reviews.</p>
+    </div>
+    <ul class="reviews-track" tabindex="0" aria-label="Customer reviews, horizontally scrollable">
+        @foreach (var review in Model.LandingReviews)
+        {
+            <li class="review-card">
+                <p class="review-text">&ldquo;@review.Text&rdquo;</p>
+                <p class="review-meta">
+                    <a asp-page="/Product" asp-route-sku="@review.Sku">about @review.ProductName</a>
+                </p>
+            </li>
+        }
+    </ul>
 </section>
+
+@* Curated rows: merchandising arrangements over real products. *@
+<section class="merch-section" aria-labelledby="featured-heading">
+    <div class="merch-heading">
+        <h2 id="featured-heading">Featured products</h2>
+        <span class="merch-note">A curated selection.</span>
+    </div>
+    @await Html.PartialAsync("_CardRow", Model.Featured)
+</section>
+
+<section class="merch-section" aria-labelledby="arrivals-heading">
+    <div class="merch-heading">
+        <h2 id="arrivals-heading">Staff picks</h2>
+        <span class="merch-note">A curated selection.</span>
+    </div>
+    @await Html.PartialAsync("_CardRow", Model.NewArrivals)
+</section>
+
+<section class="merch-section" aria-labelledby="sellers-heading">
+    <div class="merch-heading">
+        <h2 id="sellers-heading">Worth a look</h2>
+        <span class="merch-note">A curated selection.</span>
+    </div>
+    @await Html.PartialAsync("_CardRow", Model.BestSellers)
+</section>
+
+<section class="home-cta">
+    <h2>The full catalogue</h2>
+    <p>Everything the store currently stocks, with live availability.</p>
+    <a class="hero-button" asp-page="/Products">Browse all products</a>
+</section>
+
+@section Scripts {
+<script>
+// Hero auto-advance (~15s) — header height is measured in _Layout.cshtml
+(() => {
+  const hero = document.querySelector('.hero-slideshow');
+  if (!hero) return;
+
+  // Respect prefers-reduced-motion for auto-advance only
+  const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
+  if (mq.matches) return;
+
+  const radios = Array.from(hero.querySelectorAll('.hero-state'));
+  if (radios.length !== 4) return;
+
+  let current = 0;
+  let timer = null;
+  let paused = false;
+
+  const advance = () => {
+    if (paused) return;
+    current = (current + 1) % 4;
+    radios[current].checked = true;
+  };
+
+  const start = () => {
+    timer = setInterval(advance, 15000);
+  };
+
+  const stop = () => {
+    if (timer) clearInterval(timer);
+    timer = null;
+  };
+
+  const reset = () => {
+    stop();
+    start();
+  };
+
+  // Pause on hover/focus inside hero
+  hero.addEventListener('mouseenter', () => { paused = true; });
+  hero.addEventListener('mouseleave', () => { paused = false; });
+  hero.addEventListener('focusin', () => { paused = true; });
+  hero.addEventListener('focusout', () => { paused = false; });
+
+  // Pause when tab hidden
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) paused = true;
+    else paused = false;
+  });
+
+  // Reset timer on manual dot tap (label click -> radio change)
+  hero.addEventListener('change', (e) => {
+    if (e.target.matches('.hero-state')) {
+      current = radios.findIndex(r => r.checked);
+      reset();
+    }
+  });
+
+  // Listen for prefers-reduced-motion changes
+  mq.addEventListener?.('change', (e) => {
+    if (e.matches) stop();
+    else start();
+  });
+
+  start();
+})();
+</script>
+}

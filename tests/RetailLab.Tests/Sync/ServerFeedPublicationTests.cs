@@ -64,7 +64,7 @@ public sealed class ServerFeedPublicationTests
     }
 
     [Fact]
-    public async Task FreshServerSeed_PublishesFiveRevisionOneCreatedEntries()
+    public async Task FreshServerSeed_PublishesTenRevisionOneCreatedEntries()
     {
         await using var database = await TestServerDatabase.CreateAsync();
         await using var context = database.CreateServerContext();
@@ -75,9 +75,9 @@ public sealed class ServerFeedPublicationTests
         var entries = await context.SyncChangeFeedEntries
             .OrderBy(entry => entry.Sequence)
             .ToListAsync();
-        Assert.Equal(5, products.Count);
+        Assert.Equal(10, products.Count);
         Assert.All(products, product => Assert.Equal(1, product.ServerRevision));
-        Assert.Equal([1L, 2L, 3L, 4L, 5L], entries.Select(entry => entry.Sequence));
+        Assert.Equal([1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L], entries.Select(entry => entry.Sequence));
         Assert.All(entries, entry =>
         {
             Assert.Equal(1, entry.ServerRevision);

@@ -13,45 +13,95 @@
 else
 {
     <nav aria-label="Breadcrumb"><a asp-page="/Products">Catalogue</a> / @Model.Product.Sku</nav>
-    <h1>@Model.Product.Description</h1>
-    <p class="sku">Product code: @Model.Product.Sku</p>
-    <p class="price">@Model.Product.PriceDisplay</p>
-    <p class="availability @Model.Product.AvailabilityTone">@Model.Product.Availability</p>
-    @if (User.Identity?.IsAuthenticated == true)
-    {
-        if (Model.IsFavourite)
+
+    <div class="detail-grid">
+        <div class="detail-media">
+            @if (Model.HasImage)
+            {
+                <img src="@Model.ImageUrl" alt="@Model.Product.Description" />
+            }
+            else
+            {
+                <div class="detail-placeholder">
+                    <span>@Model.Product.Sku</span>
+                </div>
+            }
+        </div>
+
+        <div class="detail-facts">
+            <h1>@Model.Product.Description</h1>
+            <p class="price">@Model.Product.PriceDisplay</p>
+            <p class="availability @Model.Product.AvailabilityTone">@Model.Product.Availability</p>
+
+            @if (User.Identity?.IsAuthenticated == true)
+            {
+                if (Model.IsFavourite)
+                {
+                    <form method="post" asp-page="/Favourites" asp-page-handler="Remove">
+                        <input type="hidden" name="sku" value="@Model.Product.Sku" />
+                        <input type="hidden" name="returnUrl" value="@Request.Path" />
+                        <button type="submit">Remove from favourites</button>
+                    </form>
+                }
+                else
+                {
+                    <form method="post" asp-page="/Favourites" asp-page-handler="Add">
+                        <input type="hidden" name="sku" value="@Model.Product.Sku" />
+                        <input type="hidden" name="returnUrl" value="@Request.Path" />
+                        <button type="submit">Save to favourites</button>
+                    </form>
+                }
+
+                <form method="post" asp-page="/Basket" asp-page-handler="Add">
+                    <div class="field quantity-field">
+                        <label for="quantity">Quantity</label>
+                        <input type="number" id="quantity" name="quantity" value="1" min="1" />
+                    </div>
+                    <input type="hidden" name="sku" value="@Model.Product.Sku" />
+                    <input type="hidden" name="returnUrl" value="@Request.Path" />
+                    <button type="submit">Add to basket</button>
+                </form>
+                <form method="post" asp-page="/Basket" asp-page-handler="Add">
+                    <input type="hidden" name="sku" value="@Model.Product.Sku" />
+                    <input type="hidden" name="quantity" value="1" />
+                    <input type="hidden" name="returnUrl" value="/Basket" />
+                    <button type="submit" class="button">Buy now</button>
+                </form>
+            }
+            else
+            {
+                <p><a asp-page="/Account/Login" asp-route-returnUrl="@Request.Path">Sign in to save</a></p>
+                <p><a asp-page="/Account/Login" asp-route-returnUrl="@Request.Path">Sign in to add to basket</a></p>
+            }
+
+            @if (Model.Product.IsOutOfStock)
+            {
+                <p>Currently unavailable. Please check back later.</p>
+            }
+        </div>
+    </div>
+
+    <section class="demo-accordion" aria-label="Product information sections">
+        <h2 class="demo-heading">Product information</h2>
+        @foreach (var demoSection in Model.DemoSections)
         {
-            <form method="post" asp-page="/Favourites" asp-page-handler="Remove">
-                <input type="hidden" name="sku" value="@Model.Product.Sku" />
-                <input type="hidden" name="returnUrl" value="@Request.Path" />
-                <button type="submit">Remove from favourites</button>
-            </form>
+            <details>
+                <summary>@demoSection.Title</summary>
+                <p>@demoSection.Body</p>
+            </details>
         }
-        else
-        {
-            <form method="post" asp-page="/Favourites" asp-page-handler="Add">
-                <input type="hidden" name="sku" value="@Model.Product.Sku" />
-                <input type="hidden" name="returnUrl" value="@Request.Path" />
-                <button type="submit">Add to favourites</button>
-            </form>
-        }
-        <form method="post" asp-page="/Basket" asp-page-handler="Add">
-            <input type="hidden" name="sku" value="@Model.Product.Sku" />
-            <input type="hidden" name="returnUrl" value="@Request.Path" />
-            <div class="field quantity-field">
-                <label for="quantity">Quantity</label>
-                <input type="number" id="quantity" name="quantity" value="1" min="1" />
-            </div>
-            <button type="submit">Add to basket</button>
-        </form>
-    }
-    else
+    </section>
+
+    @if (Model.DemoReviews.Count > 0)
     {
-        <p><a asp-page="/Account/Login" asp-route-returnUrl="@Request.Path">Sign in to save</a></p>
-        <p><a asp-page="/Account/Login" asp-route-returnUrl="@Request.Path">Sign in to add to basket</a></p>
-    }
-    @if (Model.Product.IsOutOfStock)
-    {
-        <p>Currently unavailable. Please check back later.</p>
+        <section class="demo-reviews" aria-label="Customer reviews" id="reviews">
+            <h2 class="demo-heading">Reviews</h2>
+            <ul>
+                @foreach (var review in Model.DemoReviews)
+                {
+                    <li>“@review.Text”</li>
+                }
+            </ul>
+        </section>
     }
 }

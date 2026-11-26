@@ -195,7 +195,7 @@ public sealed class ProductConcurrencyTests
         var verificationRepository = new EfRetailRepository(verificationContext);
 
         var products = await verificationRepository.GetProductsAsync(includeArchived: true);
-        Assert.Equal(5, products.Count);
+        Assert.Equal(10, products.Count);
         var mug = products.Single(product => product.Sku == "AUR-100");
         Assert.Equal("Aurora insulated travel mug", mug.Description);
         Assert.Equal(24.95m, mug.Price);

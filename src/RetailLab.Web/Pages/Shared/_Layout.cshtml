@@ -4,7 +4,8 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>@ViewData["Title"] - RetailLab</title>
-    <link rel="stylesheet" href="~/css/site.css" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/storefront.css" asp-append-version="true" />
 </head>
 <body>
     <a class="skip-link" href="#main">Skip to main content</a>
@@ -34,6 +35,18 @@
             </div>
         </div>
     </header>
+    <script>
+      // Header height measurement — runs during parsing and on resize, every page
+      (() => {
+        const header = document.querySelector('.site-header');
+        const setHeaderHeight = () => {
+          const h = header ? header.offsetHeight : 72;
+          document.documentElement.style.setProperty('--header-height', h + 'px');
+        };
+        setHeaderHeight();
+        window.addEventListener('resize', setHeaderHeight);
+      })();
+    </script>
     <main id="main" class="wrap">
         @if (TempData["StatusMessage"] is string status)
         {
@@ -47,8 +60,9 @@
     </main>
     <footer class="site-footer">
         <div class="wrap">
-            <p>RetailLab demonstration store. Simulated catalogue and ordering; no real payment.</p>
+            <p>RetailLab store.</p>
         </div>
     </footer>
+    @RenderSection("Scripts", required: false)
 </body>
 </html>

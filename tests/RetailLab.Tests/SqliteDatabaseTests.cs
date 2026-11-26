@@ -28,7 +28,7 @@ public sealed class SqliteDatabaseTests
 
             await using (var verificationContext = database.CreateDbContext())
             {
-                Assert.Equal(5, await verificationContext.Products.CountAsync());
+                Assert.Equal(10, await verificationContext.Products.CountAsync());
             }
         }
         finally

@@ -13,8 +13,8 @@
 else
 {
     <nav aria-label="Breadcrumb"><a asp-page="/Orders/Index">Orders</a> / Confirmation</nav>
-    <h1>Simulated order confirmation</h1>
-    <p class="notice notice-success" role="status">Simulated order — no payment was processed.</p>
+    <h1>Order confirmation</h1>
+    <p class="notice notice-success" role="status">Your order has been placed.</p>
     <p>Placed @Model.Order.PlacedAtDisplay</p>
     <ul class="cards">
         @foreach (var line in Model.Order.Lines)

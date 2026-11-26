@@ -21,7 +21,7 @@ public sealed class PersistenceTests
         {
             await DatabaseInitializer.InitializeAsync(initializationContext);
             await DatabaseInitializer.InitializeAsync(initializationContext);
-            Assert.Equal(5, await initializationContext.Products.CountAsync());
+            Assert.Equal(10, await initializationContext.Products.CountAsync());
         }
 
         var now = new DateTimeOffset(2026, 9, 24, 11, 0, 0, TimeSpan.Zero);

@@ -1,0 +1,42 @@
+@model IReadOnlyList<RetailLab.Web.Models.ProductCard>
+@* Shared product-card row for the homepage merchandising sections.
+   Real data only: facts come from the view model; a missing image renders
+   the honest placeholder tile (design section 4). *@
+<ul class="cards card-row">
+    @foreach (var product in Model)
+    {
+        <li class="card product-card">
+            <a class="card-media" asp-page="/Product" asp-route-sku="@product.Sku" tabindex="-1" aria-hidden="true">
+                @if (product.HasImage)
+                {
+                    <img src="@product.ImageUrl" alt="" loading="lazy" />
+                }
+                else
+                {
+                    <span class="card-placeholder"><span>@product.Sku</span></span>
+                }
+            </a>
+            <div class="card-body">
+                @if (product.HasDemoReviews)
+                {
+                    <div class="card-review-row">
+                        <p class="card-rating">
+                            <span aria-hidden="true">★</span>
+                            <span class="visually-hidden">Rating:</span>
+                            @product.DemoRatingDisplay / 5
+                            <span aria-hidden="true">·</span>
+                            <a asp-page="/Product" asp-route-sku="@product.Sku" asp-fragment="reviews">@product.DemoReviewCountDisplay</a>
+                        </p>
+                        @if (product.IsHotDemoProduct)
+                        {
+                            <span class="hot-pill" title="In the featured selection">Featured</span>
+                        }
+                    </div>
+                }
+                <h3><a asp-page="/Product" asp-route-sku="@product.Sku">@product.Description</a></h3>
+                <p class="price">@product.PriceDisplay</p>
+                <p class="availability @product.AvailabilityTone">@product.Availability</p>
+            </div>
+        </li>
+    }
+</ul>
